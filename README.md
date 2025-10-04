@@ -27,7 +27,7 @@
 
 ## Future Tasks
 
-- [+] Add Authentication
+- [✅] Add Authentication
 - [ ] Add Chat History
 - [ ] Add a share & copy buttons that folks can click on after convos are generated
 - [ ] Add potential follow up questions + new chat at the end of chat page
