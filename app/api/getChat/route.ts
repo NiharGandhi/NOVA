@@ -65,7 +65,20 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log('Chat API request authenticated for user:', user.email);
+    // Get AI config including response templates
+    const { data: aiConfig, error: configError } = await supabase
+      .from('ai_config')
+      .select('*')
+      .eq('id', 1)
+      .single();
+
+    if (configError) {
+      console.error('Error fetching AI config:', configError);
+      return new Response(JSON.stringify({ error: "Error fetching AI configuration" }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
 
     // Parse request body
     const body = await request.json();
@@ -78,9 +91,22 @@ export async function POST(request: Request) {
 
     let { messages } = body;
 
+    // Get active response templates
+    const activeTemplates = (aiConfig.response_templates || [])
+      .filter((template: any) => template.isActive)
+      .map((template: any) => template.template);
+
+    // Add template instructions to system message
+    if (activeTemplates.length > 0 && messages.length > 0) {
+      const systemMessage = messages[0];
+      if (systemMessage.role === 'system') {
+        systemMessage.content = `${systemMessage.content}\n\nPlease format your response according to these templates:\n${activeTemplates.join('\n\n')}`;
+      }
+    }
+
     // Rate limiting check
     if (ratelimit) {
-      const identifier = user.id; // Use user ID for rate limiting
+      const identifier = user.id;
       const { success } = await ratelimit.limit(identifier);
       if (!success) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again in 24h." }), {

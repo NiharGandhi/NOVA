@@ -1,3 +1,11 @@
+export interface ResponseTemplate {
+  id: string;
+  name: string;
+  description: string;
+  template: string;
+  isActive: boolean;
+}
+
 export interface AIRestriction {
   maxTokens: number;
   temperature: number;
@@ -5,6 +13,7 @@ export interface AIRestriction {
   blockedTopics: string[];
   requiresCitation: boolean;
   maxRequestsPerDay: number;
+  responseTemplates?: ResponseTemplate[];
 }
 
 export const defaultAIConfig: AIRestriction = {
@@ -14,6 +23,29 @@ export const defaultAIConfig: AIRestriction = {
   blockedTopics: [],
   requiresCitation: true,
   maxRequestsPerDay: 50,
+  responseTemplates: [
+    {
+      id: 'step-by-step',
+      name: 'Step by Step',
+      description: 'Break down explanations into numbered steps',
+      template: 'Please explain this in clear, numbered steps. Each step should be concise and build upon the previous one.',
+      isActive: true
+    },
+    {
+      id: 'socratic',
+      name: 'Socratic Method',
+      description: 'Guide through questions and discovery',
+      template: 'Use the Socratic method to guide the student. Ask thought-provoking questions and help them discover the answers.',
+      isActive: false
+    },
+    {
+      id: 'analogy',
+      name: 'Analogies & Examples',
+      description: 'Explain using real-world analogies',
+      template: 'Explain concepts using relatable real-world analogies and practical examples.',
+      isActive: false
+    }
+  ]
 }
 
 export function validateAIRequest(

@@ -4,7 +4,7 @@ import {
   ReconnectInterval,
 } from "eventsource-parser";
 
-export type ChatGPTAgent = "user" | "system";
+export type ChatGPTAgent = "user" | "system" | "assistant";
 
 export interface ChatGPTMessage {
   role: ChatGPTAgent;
@@ -15,15 +15,9 @@ export interface TogetherAIStreamPayload {
   model: string;
   messages: ChatGPTMessage[];
   stream: boolean;
+  maxTokens?: number;
+  temperature?: number;
 }
-
-// const together = new Together({
-//   apiKey: process.env["TOGETHER_API_KEY"],
-//   baseURL: "https://together.helicone.ai/v1",
-//   defaultHeaders: {
-//     "Helicone-Auth": `Bearer ${process.env.HELICONE_API_KEY}`,
-//   },
-// });
 
 export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
   const encoder = new TextEncoder();
@@ -37,7 +31,11 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
       Authorization: `Bearer ${process.env.TOGETHER_API_KEY ?? ""}`,
     },
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      ...payload,
+      max_tokens: payload.maxTokens,
+      temperature: payload.temperature,
+    }),
   });
 
   const readableStream = new ReadableStream({
@@ -58,7 +56,7 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
           body: await res.text(),
         };
         console.log(
-          `Error: recieved non-200 status code, ${JSON.stringify(data)}`,
+          `Error: received non-200 status code, ${JSON.stringify(data)}`,
         );
         controller.close();
         return;
@@ -90,7 +88,7 @@ export async function TogetherAIStream(payload: TogetherAIStreamPayload) {
           // this is a prefix character (i.e., "\n\n"), do nothing
           return;
         }
-        // stream transformed JSON resposne as SSE
+        // stream transformed JSON response as SSE
         const payload = { text: text };
         // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
         controller.enqueue(
