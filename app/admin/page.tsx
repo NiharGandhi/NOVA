@@ -1,42 +1,76 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/utils/supabase'
 import AdminDashboard from '@/components/AdminDashboard'
 
-export default async function AdminPage() {
-  const cookieStore = cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return cookieStore.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          cookieStore.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          cookieStore.set({ name, value: '', ...options })
-        },
-      },
+export default function AdminPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      try {
+        setLoading(true)
+        // Get session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError)
+          throw new Error('Authentication error')
+        }
+
+        if (!session) {
+          console.log('No session found')
+          router.push('/auth/login')
+          return
+        }
+
+        // Check user role
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (userError) {
+          console.error('Error fetching user role:', userError)
+          throw new Error('Error fetching user role')
+        }
+
+        if (!userData || userData.role !== 'admin') {
+          console.log('User is not admin:', userData?.role)
+          router.push('/')
+          return
+        }
+
+        setLoading(false)
+      } catch (error) {
+        console.error('Error in checkAdminAccess:', error)
+        setError(error instanceof Error ? error.message : 'An error occurred')
+        setLoading(false)
+      }
     }
-  )
 
-  const { data: { session } } = await supabase.auth.getSession()
+    checkAdminAccess()
+  }, [router])
 
-  if (!session) {
-    redirect('/auth/login')
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
   }
 
-  const { data: user } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', session.user.id)
-    .single()
-
-  if (user?.role !== 'admin') {
-    redirect('/')
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-red-600">{error}</div>
+      </div>
+    )
   }
 
   return <AdminDashboard />
