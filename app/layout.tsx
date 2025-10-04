@@ -4,6 +4,7 @@ import PlausibleProvider from "next-plausible";
 import "./globals.css";
 import Image from "next/image";
 import bgImage from "../public/new-bg.png";
+import AuthProvider from "@/components/AuthProvider";
 
 const montserrat = Montserrat({ subsets: ["latin"] });
 
@@ -56,7 +57,9 @@ export default function RootLayout({
           alt=""
           className="absolute inset-0 -z-10 max-h-full max-w-full blur-[2px]"
         />
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

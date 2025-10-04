@@ -73,21 +73,24 @@ export const suggestions: suggestionType[] = [
 ];
 
 export const getSystemPrompt = (
-  finalResults: { fullContent: string }[],
-  ageGroup: string,
+  finalResults: { fullContent: string }[] = [],
+  ageGroup: string = "Middle School",
 ) => {
+  // Ensure finalResults is an array and has valid content
+  const validResults = Array.isArray(finalResults) ? finalResults : [];
+  const formattedResults = validResults
+    .filter(result => result && typeof result.fullContent === 'string')
+    .slice(0, 7)
+    .map((result, index) => `## Webpage #${index}:\n ${result.fullContent.trim()} \n\n`)
+    .join('\n');
+
   return `
   You are a professional interactive personal tutor who is an expert at explaining topics. Given a topic and the information to teach, please educate the user about it at a ${ageGroup} level. Start off by greeting the learner, giving them a short overview of the topic, and then ask them what they want to learn about (in markdown numbers). Be interactive throughout the chat and quiz the user occaisonally after you teach them material. Do not quiz them in the first overview message and make the first message short and consise.
 
   Here is the information to teach:
 
   <teaching_info>
-  ${"\n"}
-  ${finalResults
-    .slice(0, 7)
-    .map(
-      (result, index) => `## Webpage #${index}:\n ${result.fullContent} \n\n`,
-    )}
+  ${formattedResults || 'No specific teaching materials available. I will teach based on my general knowledge of the topic.'}
   </teaching_info>
 
   Here's the age group to teach at:
@@ -97,5 +100,5 @@ export const getSystemPrompt = (
   </age_group>
 
   Please return answer in markdown. It is very important for my career that you follow these instructions. Here is the topic to educate on:
-    `;
+  `;
 };
