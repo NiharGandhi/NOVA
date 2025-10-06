@@ -42,19 +42,19 @@ const Hero: FC<THeroProps> = ({
             height={20}
           />
           <span className="text-center text-sm font-medium italic">
-            Powered by <b>Llama 3.1</b> and <b>Together AI</b>
+            Powered by <b>NOVA AI</b>
           </span>
         </a>
         <h2 className="mt-2 bg-custom-gradient bg-clip-text text-center text-4xl font-medium tracking-tight text-gray-900 sm:text-6xl">
-          Your Personal{" "}
-          <span className="bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text font-bold text-transparent">
-            Tutor
+          Your Personal University{" "}
+          <span className="bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text font-bold text-transparent">
+            Agent
           </span>
         </h2>
         <p className="mt-4 text-balance text-center text-sm sm:text-base">
-          Enter a topic you want to learn about along with the education level
+          Enter a topic you want to learn about along with the major
           you want to be taught at and generate a personalized tutor tailored to
-          you!
+          you! <span className="font-bold text-orange-600">ALONG WITH THE SOURCES TO BACK UP THE ANSWER.</span>
         </p>
 
         <div className="mt-4 w-full pb-6">
@@ -71,7 +71,7 @@ const Hero: FC<THeroProps> = ({
         <div className="flex flex-wrap items-center justify-center gap-2.5 pb-[30px] lg:flex-nowrap lg:justify-normal">
           {suggestions.map((item) => (
             <div
-              className="flex h-[35px] cursor-pointer items-center justify-center gap-[5px] rounded border border-solid border-[#C1C1C1] px-2.5 py-2 transition hover:bg-gray-200"
+              className="flex h-[35px] cursor-pointer items-center justify-center gap-[5px] rounded border border-solid border-orange-200 px-2.5 py-2 transition hover:bg-orange-100"
               onClick={() => handleClickSuggestion(item?.name)}
               key={item.id}
             >
@@ -88,18 +88,6 @@ const Hero: FC<THeroProps> = ({
             </div>
           ))}
         </div>
-        <p className="text-center text-sm font-light leading-[normal] text-[#1B1B16]">
-          Fully open source!{" "}
-          <span className="text-sm font-medium underline">
-            <a
-              href="https://github.com/Nutlope/llamatutor"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Star it on github.
-            </a>
-          </span>
-        </p>
       </div>
       <div className="mx-auto max-w-7xl">
         <Image

@@ -8,11 +8,11 @@ import AuthProvider from "@/components/AuthProvider";
 
 const montserrat = Montserrat({ subsets: ["latin"] });
 
-let title = "Llama Tutor – AI Personal Tutor";
-let description = "Learn faster with our open source AI personal tutor";
-let url = "https://llamatutor.com/";
-let ogimage = "https://llamatutor.together.ai/og-image.png";
-let sitename = "llamatutor.com";
+let title = "NOVA – Your AI Personal Tutor";
+let description = "Learn faster with NOVA, your personal AI tutor";
+let url = "https://nova-tutor.com/";
+let ogimage = "https://nova-tutor.com/og-image.png";
+let sitename = "nova-tutor.com";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),

@@ -86,7 +86,7 @@ export default function Chat({
                 ) : (
                   <p
                     key={index}
-                    className="ml-auto w-fit rounded-xl bg-blue-500 p-4 font-medium text-white"
+                    className="ml-auto w-fit rounded-xl bg-orange-600 p-4 font-medium text-white"
                   >
                     {message.content}
                   </p>

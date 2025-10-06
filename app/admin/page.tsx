@@ -40,6 +40,10 @@ export default function AdminPage() {
           throw new Error('Error fetching user role')
         }
 
+        // Debug logging
+        console.log('Admin check - Session:', session)
+        console.log('Admin check - User data:', userData)
+
         if (!userData || userData.role !== 'admin') {
           console.log('User is not admin:', userData?.role)
           router.push('/')

@@ -34,6 +34,10 @@ const Header = () => {
           console.error('Error checking user:', checkError);
         }
 
+        // Debug logging
+        console.log('Session user:', session.user);
+        console.log('Existing user data:', existingUser);
+
         // If user doesn't exist, create them
         if (!existingUser) {
           console.log('Creating new user record');
