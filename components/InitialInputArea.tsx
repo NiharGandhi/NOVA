@@ -10,6 +10,9 @@ type TInputAreaProps = {
   ageGroup: string;
   setAgeGroup: React.Dispatch<React.SetStateAction<string>>;
   handleInitialChat: () => void;
+  selectedChatbot?: string;
+  setSelectedChatbot: React.Dispatch<React.SetStateAction<string>>;
+  chatbots: any[];
 };
 
 const InitialInputArea: FC<TInputAreaProps> = ({
@@ -19,6 +22,9 @@ const InitialInputArea: FC<TInputAreaProps> = ({
   handleInitialChat,
   ageGroup,
   setAgeGroup,
+  selectedChatbot,
+  setSelectedChatbot,
+  chatbots,
 }) => {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter") {
@@ -33,12 +39,30 @@ const InitialInputArea: FC<TInputAreaProps> = ({
 
   return (
     <form
-      className="mx-auto flex w-full flex-col items-center justify-between gap-4 sm:flex-row sm:gap-0"
+      className="mx-auto flex w-full flex-col items-center justify-between gap-4 sm:gap-2"
       onSubmit={(e) => {
         e.preventDefault();
         handleInitialChat();
       }}
     >
+      {chatbots.length > 0 && (
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Select a Tutor
+          </label>
+          <select
+            value={selectedChatbot}
+            onChange={(e) => setSelectedChatbot(e.target.value)}
+            className="block w-full rounded-lg border border-gray-300 p-3 text-sm sm:text-base focus:border-orange-500 focus:ring-orange-500"
+          >
+            {chatbots.map((chatbot) => (
+              <option key={chatbot.id} value={chatbot.id}>
+                {chatbot.name} - {chatbot.subject}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="flex w-full rounded-lg border">
         <textarea
           placeholder="Teach me about..."

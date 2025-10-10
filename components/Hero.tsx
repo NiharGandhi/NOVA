@@ -12,6 +12,9 @@ type THeroProps = {
   ageGroup: string;
   setAgeGroup: React.Dispatch<React.SetStateAction<string>>;
   handleInitialChat: () => void;
+  selectedChatbot: string;
+  setSelectedChatbot: React.Dispatch<React.SetStateAction<string>>;
+  chatbots: any[];
 };
 
 const Hero: FC<THeroProps> = ({
@@ -21,6 +24,9 @@ const Hero: FC<THeroProps> = ({
   ageGroup,
   setAgeGroup,
   handleInitialChat,
+  selectedChatbot,
+  setSelectedChatbot,
+  chatbots,
 }) => {
   const handleClickSuggestion = (value: string) => {
     setPromptValue(value);
@@ -65,6 +71,9 @@ const Hero: FC<THeroProps> = ({
             handleChat={handleChat}
             ageGroup={ageGroup}
             setAgeGroup={setAgeGroup}
+            selectedChatbot={selectedChatbot}
+            setSelectedChatbot={setSelectedChatbot}
+            chatbots={chatbots}
           />
         </div>
 

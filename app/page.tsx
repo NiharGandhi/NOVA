@@ -19,6 +19,8 @@ export default function Home() {
   const router = useRouter();
   const [inputValue, setInputValue] = useState("");
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [chatbots, setChatbots] = useState<any[]>([]);
+  const [selectedChatbot, setSelectedChatbot] = useState<string>("");
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -45,10 +47,35 @@ export default function Home() {
     };
 
     checkAuth();
+    loadChatbots();
   }, [router]);
+
+  const loadChatbots = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/chatbots', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setChatbots(data);
+        if (data.length > 0) {
+          setSelectedChatbot(data[0].id); // Select first chatbot by default
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chatbots:', error);
+    }
+  };
   const [topic, setTopic] = useState("");
   const [showResult, setShowResult] = useState(false);
   const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
+  const [ragSources, setRagSources] = useState<any[]>([]);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [messages, setMessages] = useState<{ role: string; content: string }[]>(
     [],
@@ -105,7 +132,7 @@ export default function Home() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
         },
-        body: JSON.stringify({ messages }),
+        body: JSON.stringify({ messages, chatbot_id: selectedChatbot }),
         credentials: 'include',
         cache: 'no-store'
       });
@@ -131,7 +158,17 @@ export default function Home() {
       if (event.type === "event") {
         const data = event.data;
         try {
-          const text = JSON.parse(data).text ?? "";
+          const parsed = JSON.parse(data);
+
+          // Handle sources metadata
+          if (parsed.type === 'sources') {
+            console.log('Received sources:', parsed.sources);
+            setRagSources(parsed.sources);
+            return;
+          }
+
+          // Handle regular text chunks
+          const text = parsed.text ?? "";
           fullAnswer += text;
           // Update messages with each chunk
           setMessages((prev) => {
@@ -178,77 +215,85 @@ export default function Home() {
 
       setIsLoadingSources(true);
       setLoading(true);
-      
+
       console.log('Getting session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !session) {
         console.error('Session error:', sessionError);
         setMessages([{ role: 'assistant', content: 'Please log in to use the chat.' }]);
         router.push('/auth/login');
         return;
       }
-      
+
       console.log('Session found:', session.user.email);
 
-      console.log('Fetching sources...');
-      
-      // Get fresh session token
-      const { data: { session: currentSession }, error: refreshError } = 
-        await supabase.auth.getSession();
-      
-      if (refreshError || !currentSession) {
-        console.error('Session refresh error:', refreshError);
-        throw new Error('Session expired - please log in again');
+      // Get selected chatbot configuration
+      const chatbot = chatbots.find(c => c.id === selectedChatbot);
+      if (!chatbot) {
+        setMessages([{ role: 'assistant', content: 'Please select a valid chatbot.' }]);
+        setLoading(false);
+        setIsLoadingSources(false);
+        return;
       }
 
-      // Get fresh access token
-      const { data: { session: refreshedSession }, error: tokenError } = 
-        await supabase.auth.refreshSession();
+      let parsedSources = [];
+      let sources: any[] = [];
+
+      // Fetch web sources if enabled
+      if (chatbot.use_web_search) {
+        console.log('Fetching sources...');
+      
+        // Get fresh session token
+        const { data: { session: currentSession }, error: refreshError } = 
+          await supabase.auth.getSession();
         
-      if (tokenError || !refreshedSession) {
-        console.error('Token refresh error:', tokenError);
-        throw new Error('Failed to refresh session - please log in again');
-      }
+        if (refreshError || !currentSession) {
+          console.error('Session refresh error:', refreshError);
+          throw new Error('Session expired - please log in again');
+        }
 
-      console.log('Using access token for API request');
-      let sourcesResponse = await fetch("/api/getSources", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${refreshedSession.access_token}`
-        },
-        body: JSON.stringify({ question }),
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      
-      if (!sourcesResponse.ok) {
-        const errorText = await sourcesResponse.text();
-        console.error('Sources API error:', sourcesResponse.status, errorText);
-        throw new Error(`Sources API error: ${errorText}`);
-      }
-    let sources;
-    if (sourcesResponse.ok) {
-      sources = await sourcesResponse.json();
+        // Get fresh access token
+        const { data: { session: refreshedSession }, error: tokenError } = 
+          await supabase.auth.refreshSession();
+          
+        if (tokenError || !refreshedSession) {
+          console.error('Token refresh error:', tokenError);
+          throw new Error('Failed to refresh session - please log in again');
+        }
 
-      setSources(sources);
-    } else {
-      setSources([]);
-    }
-    setIsLoadingSources(false);
+        console.log('Using access token for API request');
+        const sourcesResponse = await fetch("/api/getSources", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${refreshedSession.access_token}`
+          },
+          body: JSON.stringify({ question }),
+          credentials: 'include',
+          cache: 'no-store'
+        });
+        
+        if (!sourcesResponse.ok) {
+          const errorText = await sourcesResponse.text();
+          console.error('Sources API error:', sourcesResponse.status, errorText);
+          throw new Error(`Sources API error: ${errorText}`);
+        }
 
-    console.log('Fetching parsed sources...');
-    console.log('Fetching parsed sources...');
-    
-    // Get fresh access token for the second request
-    const { data: { session: newSession }, error: newTokenError } = 
-      await supabase.auth.refreshSession();
-      
-    if (newTokenError || !newSession) {
-      console.error('Token refresh error:', newTokenError);
-      throw new Error('Failed to refresh session - please log in again');
-    }
+        sources = await sourcesResponse.json();
+        setSources(sources);
+        setIsLoadingSources(false);
+
+        console.log('Fetching parsed sources...');
+        
+        // Get fresh access token for the second request
+        const { data: { session: newSession }, error: newTokenError } = 
+          await supabase.auth.refreshSession();
+          
+        if (newTokenError || !newSession) {
+          console.error('Token refresh error:', newTokenError);
+          throw new Error('Failed to refresh session - please log in again');
+        }
 
     const parsedSourcesRes = await fetch("/api/getParsedSources", {
       method: "POST",
@@ -266,43 +311,43 @@ export default function Home() {
       console.error('ParsedSources API error:', parsedSourcesRes.status, errorText);
       throw new Error(`ParsedSources API error: ${errorText}`);
     }
-    let parsedSources = [];
-    if (parsedSourcesRes.ok) {
-      parsedSources = await parsedSourcesRes.json();
+        if (parsedSourcesRes.ok) {
+          parsedSources = await parsedSourcesRes.json();
+        }
+      }
+
+      // Ensure parsedSources is an array with the correct shape
+      const validParsedSources = Array.isArray(parsedSources) ? parsedSources : [];
+      const formattedSources = validParsedSources.map(source => ({
+        fullContent: typeof source === 'string' ? source : 
+                    typeof source === 'object' && source.fullContent ? source.fullContent : ''
+      }));
+
+      // Get fresh access token for the chat request
+      const { data: { session: chatSession }, error: chatTokenError } = 
+        await supabase.auth.refreshSession();
+        
+      if (chatTokenError || !chatSession) {
+        console.error('Token refresh error:', chatTokenError);
+        throw new Error('Failed to refresh session - please log in again');
+      }
+
+      const initialMessage = [
+        { role: "system", content: getSystemPrompt(formattedSources, ageGroup) },
+        { role: "user", content: `${question}` },
+      ];
+      setMessages(initialMessage);
+
+      console.log('Starting chat with initial message...');
+      await handleChat(initialMessage, chatSession.access_token);
+    } catch (error) {
+      console.error('Error in handleSourcesAndChat:', error);
+      setMessages([{ role: 'assistant', content: 'Sorry, there was an error processing your request. Please try again.' }]);
+    } finally {
+      setLoading(false);
+      setIsLoadingSources(false);
     }
-
-    // Ensure parsedSources is an array with the correct shape
-    const validParsedSources = Array.isArray(parsedSources) ? parsedSources : [];
-    const formattedSources = validParsedSources.map(source => ({
-      fullContent: typeof source === 'string' ? source : 
-                  typeof source === 'object' && source.fullContent ? source.fullContent : ''
-    }));
-
-    // Get fresh access token for the chat request
-    const { data: { session: chatSession }, error: chatTokenError } = 
-      await supabase.auth.refreshSession();
-      
-    if (chatTokenError || !chatSession) {
-      console.error('Token refresh error:', chatTokenError);
-      throw new Error('Failed to refresh session - please log in again');
-    }
-
-    const initialMessage = [
-      { role: "system", content: getSystemPrompt(formattedSources, ageGroup) },
-      { role: "user", content: `${question}` },
-    ];
-    setMessages(initialMessage);
-
-    console.log('Starting chat with initial message...');
-    await handleChat(initialMessage, chatSession.access_token);
-  } catch (error) {
-    console.error('Error in handleSourcesAndChat:', error);
-    setMessages([{ role: 'assistant', content: 'Sorry, there was an error processing your request. Please try again.' }]);
-  } finally {
-    setLoading(false);
-    setIsLoadingSources(false);
   }
-}
 
   return (
     <>
@@ -324,7 +369,7 @@ export default function Home() {
                   handleChat={handleChat}
                   topic={topic}
                 />
-                <Sources sources={sources} isLoading={isLoadingSources} />
+                <Sources sources={sources} isLoading={isLoadingSources} ragSources={ragSources} />
               </div>
             </div>
           </div>
@@ -336,10 +381,12 @@ export default function Home() {
             ageGroup={ageGroup}
             setAgeGroup={setAgeGroup}
             handleInitialChat={handleInitialChat}
+            selectedChatbot={selectedChatbot}
+            setSelectedChatbot={setSelectedChatbot}
+            chatbots={chatbots}
           />
         )}
       </main>
-      {/* <Footer /> */}
       <Footer />
     </>
   );

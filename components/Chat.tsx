@@ -65,6 +65,7 @@ export default function Chat({
           <b>Topic: </b>
           {topic}
         </p>
+
         <div
           ref={scrollableContainerRef}
           className="mt-2 overflow-y-scroll rounded-lg border border-solid border-[#C2C2C2] bg-white px-5 lg:p-7"
