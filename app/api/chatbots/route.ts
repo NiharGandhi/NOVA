@@ -62,33 +62,49 @@ export async function GET(request: Request) {
     }
 
     // Check if user is admin
-    const { data: userData } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
+    if (userError) {
+      console.log(`User lookup error for ${user.email}:`, userError);
+    }
+
     const isAdmin = userData?.role === 'admin';
+    console.log(`User ${user.email} (${user.id}) role: ${userData?.role || 'NOT FOUND'}, isAdmin: ${isAdmin}`);
 
     let chatbots, error;
 
-    // If admin, use admin client to bypass RLS; otherwise use regular client
-    if (isAdmin && supabaseAdmin) {
+    // Use admin client to bypass RLS for all users
+    // We manually filter by is_active for students
+    if (!supabaseAdmin) {
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (isAdmin) {
+      // Admins see all chatbots
       const result = await supabaseAdmin
         .from('chatbots')
         .select('*')
         .order('created_at', { ascending: false });
       chatbots = result.data;
       error = result.error;
+      console.log(`Admin fetched ${chatbots?.length || 0} chatbots (all)`);
     } else {
-      // Regular users only see active chatbots
-      const result = await supabase
+      // Students only see active chatbots (use admin client to bypass RLS issues)
+      const result = await supabaseAdmin
         .from('chatbots')
         .select('*')
         .eq('is_active', true)
         .order('created_at', { ascending: false });
       chatbots = result.data;
       error = result.error;
+      console.log(`Student fetched ${chatbots?.length || 0} active chatbots via admin client`);
     }
 
     if (error) {
