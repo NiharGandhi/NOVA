@@ -1497,7 +1497,7 @@ export default function AdminDashboard() {
                 {instructors.length === 0 ? (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <p className="text-sm text-yellow-800">
-                      No instructors found. To create an instructor, change a user's role to 'instructor' in the Supabase database.
+                      No instructors found. To create an instructor, change a user&apos;s role to &apos;instructor&apos; in the Supabase database.
                     </p>
                   </div>
                 ) : (
