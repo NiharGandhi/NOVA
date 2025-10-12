@@ -12,9 +12,7 @@ type THeroProps = {
   ageGroup: string;
   setAgeGroup: React.Dispatch<React.SetStateAction<string>>;
   handleInitialChat: () => void;
-  selectedChatbot: string;
-  setSelectedChatbot: React.Dispatch<React.SetStateAction<string>>;
-  chatbots: any[];
+  chatbotName?: string;
 };
 
 const Hero: FC<THeroProps> = ({
@@ -24,9 +22,7 @@ const Hero: FC<THeroProps> = ({
   ageGroup,
   setAgeGroup,
   handleInitialChat,
-  selectedChatbot,
-  setSelectedChatbot,
-  chatbots,
+  chatbotName,
 }) => {
   const handleClickSuggestion = (value: string) => {
     setPromptValue(value);
@@ -35,6 +31,11 @@ const Hero: FC<THeroProps> = ({
   return (
     <>
       <div className="mx-auto mt-10 flex max-w-3xl flex-col items-center justify-center sm:mt-36">
+        {chatbotName && (
+          <div className="mb-4 inline-block rounded-full bg-orange-100 px-4 py-2">
+            <p className="text-sm font-medium text-orange-600">{chatbotName}</p>
+          </div>
+        )}
         <h2 className="mt-2 bg-custom-gradient bg-clip-text text-center text-4xl font-medium tracking-tight text-gray-900 sm:text-6xl">
           Your Personal University{" "}
           <span className="bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text font-bold text-transparent">
@@ -42,8 +43,7 @@ const Hero: FC<THeroProps> = ({
           </span>
         </h2>
         <p className="mt-4 text-balance text-center text-sm sm:text-base">
-          Enter a topic you want to learn about along with the major
-          you want to be taught at and generate a personalized tutor tailored to
+          Enter a topic you want to learn about and generate a personalized tutor tailored to
           you! <span className="font-bold text-orange-600">ALONG WITH THE SOURCES TO BACK UP THE ANSWER.</span>
         </p>
 
@@ -55,9 +55,6 @@ const Hero: FC<THeroProps> = ({
             handleChat={handleChat}
             ageGroup={ageGroup}
             setAgeGroup={setAgeGroup}
-            selectedChatbot={selectedChatbot}
-            setSelectedChatbot={setSelectedChatbot}
-            chatbots={chatbots}
           />
         </div>
 

@@ -37,14 +37,19 @@ export async function middleware(request: NextRequest) {
     const authHeader = request.headers.get('Authorization')
     const token = authHeader?.split('Bearer ')[1]
 
-    // For API routes, check the auth token
+    // For API routes, check the auth token (except OAuth callback)
     if (request.nextUrl.pathname.startsWith('/api/')) {
+      // Skip auth check for OAuth callback route (called by Google)
+      if (request.nextUrl.pathname === '/api/calendar/callback') {
+        return response;
+      }
+
       if (!token) {
         console.log('No auth token provided')
         return new NextResponse(
           JSON.stringify({ error: 'Unauthorized - No auth token' }),
-          { 
-            status: 401, 
+          {
+            status: 401,
             headers: { 'Content-Type': 'application/json' }
           }
         )
@@ -65,10 +70,18 @@ export async function middleware(request: NextRequest) {
       }
 
       console.log('Valid session found for:', user.email)
-      
-      // Add user info to request headers
-      request.headers.set('x-user-id', user.id)
-      request.headers.set('x-user-email', user.email || '')
+
+      // Create new headers with user info
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set('x-user-id', user.id)
+      requestHeaders.set('x-user-email', user.email || '')
+
+      // Create a new response with the updated headers
+      response = NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      })
     }
 
     return response

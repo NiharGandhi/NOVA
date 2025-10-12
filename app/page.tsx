@@ -2,6 +2,8 @@
 
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
+import CalendarEvents from "@/components/CalendarEvents";
+import StudyPlan from "@/components/StudyPlan";
 import { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
@@ -9,6 +11,8 @@ import { supabase } from '@/utils/supabase';
 export default function Home() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("");
+  const [userEmail, setUserEmail] = useState<string>("");
   const [chatbots, setChatbots] = useState<any[]>([]);
 
   useEffect(() => {
@@ -19,6 +23,16 @@ export default function Home() {
         router.push('/auth/login');
         return;
       }
+
+      // Set user email
+      setUserEmail(session.user.email || '');
+
+      // Extract name from email (before @) or use metadata
+      const name = session.user.user_metadata?.full_name ||
+                   session.user.user_metadata?.name ||
+                   session.user.email?.split('@')[0] ||
+                   'Student';
+      setUserName(name);
 
       // Get user role from the users table
       const { data: userData, error: userError } = await supabase
@@ -68,18 +82,50 @@ export default function Home() {
       <Header />
 
       <main className="flex grow flex-col px-4 pb-4">
-        <div className="mx-auto mt-10 flex max-w-7xl flex-col items-center justify-center sm:mt-36">
-          <h2 className="mt-2 bg-custom-gradient bg-clip-text text-center text-4xl font-medium tracking-tight text-gray-900 sm:text-6xl">
-            Your Personal University{" "}
-            <span className="bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text font-bold text-transparent">
-              Agent
-            </span>
-          </h2>
-          <p className="mt-4 text-balance text-center text-sm sm:text-base">
-            Select a course to start learning with your AI-powered personal tutor.
-          </p>
+        <div className="mx-auto mt-4 flex max-w-7xl flex-col sm:mt-6">
+          {/* User Greeting Section */}
+          <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 p-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
+                Welcome back, {userName}! 👋
+              </h1>
+              <p className="mt-1 text-xs text-gray-600 sm:text-sm">
+                {userEmail}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs sm:text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-gray-600">Role:</span>
+                <span className="font-semibold text-orange-600 capitalize">
+                  {userRole || 'Student'}
+                </span>
+              </div>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-gray-600">Courses:</span>
+                <span className="font-semibold text-orange-600">
+                  {chatbots.length}
+                </span>
+              </div>
+            </div>
+          </div>
 
-          <div className="mt-12 grid w-full max-w-5xl grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Calendar Events and Study Plan Section */}
+          <div className="mb-8 grid gap-6 lg:grid-cols-2">
+            <CalendarEvents />
+            <StudyPlan />
+          </div>
+
+          {/* Courses Section */}
+          <div>
+            <h2 className="mb-6 text-2xl font-bold text-gray-900 sm:text-3xl">
+              Your Courses
+            </h2>
+            <p className="mb-8 text-sm text-gray-600 sm:text-base">
+              Select a course to start learning with your AI-powered personal tutor.
+            </p>
+
+          <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {chatbots.map((chatbot) => (
               <div
                 key={chatbot.id}
@@ -127,6 +173,7 @@ export default function Home() {
               )}
             </div>
           )}
+          </div>
         </div>
       </main>
 

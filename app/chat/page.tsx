@@ -4,6 +4,7 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Sources from "@/components/Sources";
+import ChatHistory from "@/components/ChatHistory";
 import { useState, useEffect } from "react";
 import {
   createParser,
@@ -88,6 +89,125 @@ export default function ChatPage() {
   );
   const [loading, setLoading] = useState(false);
   const [ageGroup, setAgeGroup] = useState("Middle School");
+  const [chatbotName, setChatbotName] = useState<string>("");
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(true);
+
+  useEffect(() => {
+    if (selectedChatbot && chatbots.length > 0) {
+      const chatbot = chatbots.find(c => c.id === selectedChatbot);
+      if (chatbot) {
+        setChatbotName(`${chatbot.name} - ${chatbot.subject}`);
+      }
+    }
+  }, [selectedChatbot, chatbots]);
+
+  // Load a previous chat session
+  const loadSession = async (sessionId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/chat-history/messages?session_id=${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const loadedMessages = data.messages.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+        // Extract topic from first user message
+        const firstUserMessage = loadedMessages.find(m => m.role === 'user');
+        if (firstUserMessage) {
+          setTopic(firstUserMessage.content);
+        }
+
+        setMessages(loadedMessages);
+        setCurrentSessionId(sessionId);
+        setShowResult(true);
+      }
+    } catch (error) {
+      console.error('Error loading session:', error);
+    }
+  };
+
+  // Start a new chat
+  const handleNewChat = () => {
+    setMessages([]);
+    setCurrentSessionId(null);
+    setShowResult(false);
+    setInputValue('');
+    setSources([]);
+    setRagSources([]);
+    setTopic('');
+  };
+
+  // Save messages to current session
+  const saveCurrentSession = async (messagesToSave: Array<{ role: string; content: string }>) => {
+    try {
+      if (!messagesToSave || messagesToSave.length === 0) return;
+
+      // Filter out system messages and only save user/assistant messages
+      const messagesToStore = messagesToSave.filter(m => m && m.role && m.role !== 'system');
+      if (messagesToStore.length === 0) return;
+
+      if (!currentSessionId) {
+        // Create new session
+        const firstUserMessage = messagesToStore.find(m => m.role === 'user')?.content || 'New Chat';
+        const title = firstUserMessage.substring(0, 50) + (firstUserMessage.length > 50 ? '...' : '');
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const createResponse = await fetch('/api/chat-history/sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ chatbot_id: selectedChatbot, title })
+        });
+
+        if (createResponse.ok) {
+          const data = await createResponse.json();
+          setCurrentSessionId(data.session.id);
+
+          // Save only the new messages (user + assistant)
+          const newMessages = messagesToStore.slice(-2); // Last user message + assistant response
+          await fetch('/api/chat-history/messages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ session_id: data.session.id, messages: newMessages })
+          });
+        }
+      } else {
+        // Session exists, save only the latest messages
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Save only the last 2 messages (latest exchange)
+        const newMessages = messagesToStore.slice(-2);
+        await fetch('/api/chat-history/messages', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ session_id: currentSessionId, messages: newMessages })
+        });
+      }
+    } catch (error) {
+      console.error('Error saving session:', error);
+    }
+  };
 
   const handleInitialChat = async () => {
     try {
@@ -207,6 +327,12 @@ export default function ChatPage() {
       parser.feed(chunkValue);
     }
     setLoading(false);
+
+    // Save chat history after streaming completes
+    setMessages((currentMessages) => {
+      saveCurrentSession(currentMessages);
+      return currentMessages;
+    });
   } catch (error) {
     console.error(error);
     setLoading(false);
@@ -359,39 +485,67 @@ export default function ChatPage() {
     <>
       <Header />
 
-      <main
-        className={`flex grow flex-col px-4 pb-4 ${showResult ? "overflow-hidden" : ""}`}
-      >
-        {showResult ? (
-          <div className="mt-2 flex w-full grow flex-col justify-between overflow-hidden">
-            <div className="flex w-full grow flex-col space-y-2 overflow-hidden">
-              <div className="mx-auto flex w-full max-w-7xl grow flex-col gap-4 overflow-hidden lg:flex-row lg:gap-10">
-                <Chat
-                  messages={messages}
-                  disabled={loading}
-                  promptValue={inputValue}
-                  setPromptValue={setInputValue}
-                  setMessages={setMessages}
-                  handleChat={handleChat}
-                  topic={topic}
-                />
-                <Sources sources={sources} isLoading={isLoadingSources} ragSources={ragSources} />
-              </div>
+      <main className="flex grow overflow-hidden px-4 pb-4">
+        <div className="flex w-full grow overflow-hidden">
+          {/* Toggle Sidebar Button */}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="fixed left-4 top-20 z-10 rounded-lg bg-white p-2 shadow-lg hover:bg-gray-100"
+            title={showHistory ? 'Hide history' : 'Show history'}
+          >
+            <svg className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {showHistory ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              )}
+            </svg>
+          </button>
+
+          {/* Chat History Sidebar - Always visible */}
+          {showHistory && selectedChatbot && (
+            <div className="w-64 shrink-0 overflow-hidden">
+              <ChatHistory
+                chatbotId={selectedChatbot}
+                currentSessionId={currentSessionId}
+                onSelectSession={loadSession}
+                onNewChat={handleNewChat}
+              />
             </div>
+          )}
+
+          {/* Main Content Area */}
+          <div className="flex w-full grow flex-col overflow-hidden">
+            {showResult ? (
+              <div className="flex w-full grow flex-col justify-between overflow-hidden">
+                <div className="flex w-full grow flex-col space-y-2 overflow-hidden">
+                  <div className="mx-auto flex w-full max-w-7xl grow flex-col gap-4 overflow-hidden lg:flex-row lg:gap-10">
+                    <Chat
+                      messages={messages}
+                      disabled={loading}
+                      promptValue={inputValue}
+                      setPromptValue={setInputValue}
+                      setMessages={setMessages}
+                      handleChat={handleChat}
+                      topic={topic}
+                    />
+                    <Sources sources={sources} isLoading={isLoadingSources} ragSources={ragSources} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Hero
+                promptValue={inputValue}
+                setPromptValue={setInputValue}
+                handleChat={handleChat}
+                ageGroup={ageGroup}
+                setAgeGroup={setAgeGroup}
+                handleInitialChat={handleInitialChat}
+                chatbotName={chatbotName}
+              />
+            )}
           </div>
-        ) : (
-          <Hero
-            promptValue={inputValue}
-            setPromptValue={setInputValue}
-            handleChat={handleChat}
-            ageGroup={ageGroup}
-            setAgeGroup={setAgeGroup}
-            handleInitialChat={handleInitialChat}
-            selectedChatbot={selectedChatbot}
-            setSelectedChatbot={setSelectedChatbot}
-            chatbots={chatbots}
-          />
-        )}
+        </div>
       </main>
       <Footer />
     </>
