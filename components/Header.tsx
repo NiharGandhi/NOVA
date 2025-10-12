@@ -93,6 +93,14 @@ const Header = () => {
             Admin Dashboard
           </Link>
         )}
+        {!loading && userRole === 'instructor' && (
+          <Link
+            href="/instructor"
+            className="text-sm font-medium text-orange-600 hover:text-orange-700"
+          >
+            Instructor Dashboard
+          </Link>
+        )}
         <button
           onClick={handleLogout}
           className="rounded-md bg-orange-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-orange-700"

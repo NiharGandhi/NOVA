@@ -73,7 +73,8 @@ export async function GET(request: Request) {
     }
 
     const isAdmin = userData?.role === 'admin';
-    console.log(`User ${user.email} (${user.id}) role: ${userData?.role || 'NOT FOUND'}, isAdmin: ${isAdmin}`);
+    const isInstructor = userData?.role === 'instructor';
+    console.log(`User ${user.email} (${user.id}) role: ${userData?.role || 'NOT FOUND'}, isAdmin: ${isAdmin}, isInstructor: ${isInstructor}`);
 
     let chatbots, error;
 
@@ -95,6 +96,19 @@ export async function GET(request: Request) {
       chatbots = result.data;
       error = result.error;
       console.log(`Admin fetched ${chatbots?.length || 0} chatbots (all)`);
+    } else if (isInstructor) {
+      // Instructors see their assigned chatbots
+      const result = await supabaseAdmin
+        .from('chatbots')
+        .select(`
+          *,
+          course_instructors!inner(instructor_id)
+        `)
+        .eq('course_instructors.instructor_id', user.id)
+        .order('created_at', { ascending: false });
+      chatbots = result.data;
+      error = result.error;
+      console.log(`Instructor fetched ${chatbots?.length || 0} assigned chatbots`);
     } else {
       // Students only see active chatbots (use admin client to bypass RLS issues)
       const result = await supabaseAdmin

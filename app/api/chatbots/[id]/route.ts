@@ -84,7 +84,7 @@ export async function GET(
   }
 }
 
-// PATCH - Update chatbot (admin only)
+// PATCH - Update chatbot (admin or assigned instructor)
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -128,18 +128,45 @@ export async function PATCH(
       });
     }
 
-    // Check if user is admin
+    // Check if user is admin or instructor assigned to this course
     const { data: userData } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (userData?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+    const isAdmin = userData?.role === 'admin';
+    const isInstructor = userData?.role === 'instructor';
+
+    if (!isAdmin && !isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden - Admin or Instructor access required" }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+
+    // If instructor, verify they're assigned to this course
+    if (isInstructor && !isAdmin) {
+      if (!supabaseAdmin) {
+        return new Response(JSON.stringify({ error: "Server configuration error" }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      const { data: assignment, error: assignmentError } = await supabaseAdmin
+        .from('course_instructors')
+        .select('id')
+        .eq('chatbot_id', params.id)
+        .eq('instructor_id', user.id)
+        .single();
+
+      if (assignmentError || !assignment) {
+        return new Response(JSON.stringify({ error: "Forbidden - Not assigned to this course" }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     const body = await request.json();

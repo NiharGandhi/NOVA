@@ -67,11 +67,74 @@ export async function GET(request: Request) {
       });
     }
 
-    const { data: materials, error } = await supabase
-      .from('course_materials')
-      .select('*')
-      .eq('chatbot_id', chatbotId)
-      .order('order_index', { ascending: true });
+    // Check user role
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const isAdmin = userData?.role === 'admin';
+    const isInstructor = userData?.role === 'instructor';
+
+    // Use admin client to bypass RLS for admins and instructors
+    // since RLS policies might not be working correctly
+    if (!supabaseAdmin) {
+      return new Response(JSON.stringify({ error: "Server configuration error" }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    let materials;
+    let error;
+
+    if (isAdmin) {
+      // Admins see all materials for this chatbot
+      const result = await supabaseAdmin
+        .from('course_materials')
+        .select('*')
+        .eq('chatbot_id', chatbotId)
+        .order('order_index', { ascending: true });
+
+      materials = result.data;
+      error = result.error;
+    } else if (isInstructor) {
+      // Verify instructor is assigned to this course
+      const { data: assignment } = await supabaseAdmin
+        .from('course_instructors')
+        .select('id')
+        .eq('chatbot_id', chatbotId)
+        .eq('instructor_id', user.id)
+        .single();
+
+      if (!assignment) {
+        return new Response(JSON.stringify({ error: "Not assigned to this course" }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Fetch materials using admin client
+      const result = await supabaseAdmin
+        .from('course_materials')
+        .select('*')
+        .eq('chatbot_id', chatbotId)
+        .order('order_index', { ascending: true });
+
+      materials = result.data;
+      error = result.error;
+    } else {
+      // Students use RLS policies
+      const result = await supabase
+        .from('course_materials')
+        .select('*')
+        .eq('chatbot_id', chatbotId)
+        .order('order_index', { ascending: true });
+
+      materials = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('Error fetching course materials:', error);
@@ -81,7 +144,8 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json(materials);
+    console.log(`Fetched ${materials?.length || 0} course materials for chatbot ${chatbotId}`);
+    return NextResponse.json(materials || []);
   } catch (error) {
     console.error('Course materials API error:', error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {

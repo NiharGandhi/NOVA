@@ -16,7 +16,7 @@ const supabaseAdmin = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABA
     }
   ) : null;
 
-// PATCH - Update course material (admin only)
+// PATCH - Update course material (admin or assigned instructor)
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -60,19 +60,24 @@ export async function PATCH(
       });
     }
 
-    // Check if user is admin
+    // Check if user is admin or instructor
     const { data: userData } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (userData?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+    const isAdmin = userData?.role === 'admin';
+    const isInstructor = userData?.role === 'instructor';
+
+    if (!isAdmin && !isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden - Admin or Instructor access required" }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    // RLS policies will automatically check instructor assignment
 
     const body = await request.json();
     const updates: any = {};

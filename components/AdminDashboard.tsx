@@ -54,10 +54,15 @@ export default function AdminDashboard() {
 
   const [newBlockedTopic, setNewBlockedTopic] = useState('')
   const [message, setMessage] = useState('')
-  const [activeTab, setActiveTab] = useState('general') // 'general', 'templates', 'chatbots', or 'materials'
+  const [activeTab, setActiveTab] = useState('general') // 'general', 'templates', 'chatbots', 'materials', or 'instructors'
 
   // Chatbot management state
   const [chatbots, setChatbots] = useState<any[]>([])
+
+  // Instructor management state
+  const [instructors, setInstructors] = useState<any[]>([])
+  const [courseInstructors, setCourseInstructors] = useState<any[]>([])
+  const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<string>('')
   const [selectedChatbot, setSelectedChatbot] = useState<any>(null)
   const [newChatbot, setNewChatbot] = useState({
     name: '',
@@ -81,6 +86,104 @@ export default function AdminDashboard() {
     file_type: 'text',
     order_index: 0
   })
+
+  // Load instructors
+  const loadInstructors = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/instructors', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setInstructors(data);
+      }
+    } catch (error) {
+      console.error('Error loading instructors:', error);
+    }
+  };
+
+  // Load instructors for a specific course
+  const loadCourseInstructors = async (chatbotId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/instructors?chatbot_id=${chatbotId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCourseInstructors(data);
+      }
+    } catch (error) {
+      console.error('Error loading course instructors:', error);
+    }
+  };
+
+  // Assign instructor to course
+  const assignInstructor = async (chatbotId: string, instructorId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/instructors', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ chatbot_id: chatbotId, instructor_id: instructorId, action: 'assign' })
+      });
+
+      if (response.ok) {
+        setMessage('Instructor assigned successfully!');
+        loadCourseInstructors(chatbotId);
+      } else {
+        const error = await response.json();
+        setMessage(`Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error assigning instructor:', error);
+      setMessage('Error assigning instructor');
+    }
+  };
+
+  // Remove instructor from course
+  const removeInstructor = async (assignmentId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/instructors?assignment_id=${assignmentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (response.ok) {
+        setMessage('Instructor removed successfully!');
+        if (selectedInstructorCourse) {
+          loadCourseInstructors(selectedInstructorCourse);
+        }
+      } else {
+        const error = await response.json();
+        setMessage(`Error: ${error.error}`);
+      }
+    } catch (error) {
+      console.error('Error removing instructor:', error);
+      setMessage('Error removing instructor');
+    }
+  };
 
   useEffect(() => {
     // Load existing config when component mounts
@@ -115,6 +218,7 @@ export default function AdminDashboard() {
 
     loadConfig();
     loadChatbots();
+    loadInstructors();
   }, []);
 
   useEffect(() => {
@@ -477,6 +581,16 @@ export default function AdminDashboard() {
             }`}
           >
             Course Materials
+          </button>
+          <button
+            onClick={() => setActiveTab('instructors')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'instructors'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Instructors
           </button>
         </nav>
       </div>
@@ -1267,6 +1381,142 @@ export default function AdminDashboard() {
                 )}
               </>
             )}
+          </>
+        ) : activeTab === 'instructors' ? (
+          <>
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Manage Course Instructors</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Assign instructors to courses. Instructors can view analytics for their assigned courses.
+              </p>
+
+              {/* Select Course */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Course
+                </label>
+                <select
+                  value={selectedInstructorCourse}
+                  onChange={(e) => {
+                    setSelectedInstructorCourse(e.target.value);
+                    if (e.target.value) {
+                      loadCourseInstructors(e.target.value);
+                    } else {
+                      setCourseInstructors([]);
+                    }
+                  }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500"
+                >
+                  <option value="">-- Select a course --</option>
+                  {chatbots.map(chatbot => (
+                    <option key={chatbot.id} value={chatbot.id}>
+                      {chatbot.name} - {chatbot.subject}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedInstructorCourse && (
+                <>
+                  {/* Assign New Instructor */}
+                  <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">Assign Instructor</h4>
+                    <div className="flex gap-3">
+                      <select
+                        id="instructor-select"
+                        className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500"
+                      >
+                        <option value="">-- Select an instructor --</option>
+                        {instructors.map(instructor => (
+                          <option key={instructor.id} value={instructor.id}>
+                            {instructor.email}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const select = document.getElementById('instructor-select') as HTMLSelectElement;
+                          if (select.value) {
+                            assignInstructor(selectedInstructorCourse, select.value);
+                            select.value = '';
+                          }
+                        }}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 text-sm font-medium"
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Current Instructors */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-900 mb-3">
+                      Current Instructors ({courseInstructors.length})
+                    </h4>
+                    {courseInstructors.length === 0 ? (
+                      <p className="text-sm text-gray-500 italic">No instructors assigned to this course yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {courseInstructors.map((assignment: any) => (
+                          <div
+                            key={assignment.id}
+                            className="flex items-center justify-between bg-white border border-gray-200 rounded-lg p-3"
+                          >
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {assignment.instructor?.email}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Assigned on {new Date(assignment.assigned_at).toLocaleDateString()}
+                                {assignment.assigned_by_user && ` by ${assignment.assigned_by_user.email}`}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (confirm('Remove this instructor from the course?')) {
+                                  removeInstructor(assignment.id);
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* All Instructors List */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">
+                  All Instructors ({instructors.length})
+                </h4>
+                {instructors.length === 0 ? (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <p className="text-sm text-yellow-800">
+                      No instructors found. To create an instructor, change a user's role to 'instructor' in the Supabase database.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {instructors.map((instructor: any) => (
+                      <div
+                        key={instructor.id}
+                        className="bg-white border border-gray-200 rounded-lg p-3"
+                      >
+                        <p className="text-sm font-medium text-gray-900">{instructor.email}</p>
+                        <p className="text-xs text-gray-500">
+                          Joined {new Date(instructor.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         ) : null}
 

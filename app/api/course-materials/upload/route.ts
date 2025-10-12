@@ -64,18 +64,40 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check if user is admin
+    // Check if user is admin or instructor
     const { data: userData } = await supabase
       .from('users')
       .select('role')
       .eq('id', user.id)
       .single();
 
-    if (userData?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: "Forbidden - Admin access required" }), {
+    const isAdmin = userData?.role === 'admin';
+    const isInstructor = userData?.role === 'instructor';
+
+    if (!isAdmin && !isInstructor) {
+      return new Response(JSON.stringify({ error: "Forbidden - Admin or Instructor access required" }), {
         status: 403,
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+
+    const chatbot_id_parsed = await request.clone().formData().then(fd => fd.get('chatbot_id') as string);
+
+    // If instructor, verify they're assigned to this course
+    if (isInstructor && !isAdmin) {
+      const { data: assignment, error: assignmentError } = await supabaseAdmin
+        .from('course_instructors')
+        .select('id')
+        .eq('chatbot_id', chatbot_id_parsed)
+        .eq('instructor_id', user.id)
+        .single();
+
+      if (assignmentError || !assignment) {
+        return new Response(JSON.stringify({ error: "Forbidden - Not assigned to this course" }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Parse multipart form data

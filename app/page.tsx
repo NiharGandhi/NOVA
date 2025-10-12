@@ -47,7 +47,8 @@ function HomeContent() {
         console.error('Error fetching user role:', userError);
         setUserRole('student'); // Default to student on error
       } else {
-        setUserRole(userData?.role || 'student');
+        const role = userData?.role || 'student';
+        setUserRole(role);
       }
     };
 
