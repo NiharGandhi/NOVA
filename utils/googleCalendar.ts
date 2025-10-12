@@ -84,12 +84,13 @@ export async function getCalendarEvents(
           combined.includes('paper') ||
           combined.includes('quiz') ||
           combined.includes('exam') ||
+          combined.includes('midterm') ||
           combined.includes('test');
 
         return {
           id: event.id || '',
           summary: event.summary || '',
-          description: event.description,
+          description: event.description || undefined,
           start: event.start?.dateTime || event.start?.date || '',
           end: event.end?.dateTime || event.end?.date || '',
           isDeadline,

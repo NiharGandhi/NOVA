@@ -263,7 +263,7 @@ export default function CalendarEvents() {
       {events.length === 0 ? (
         <div className="py-8 text-center text-gray-500">
           <p className="text-sm">No upcoming deadlines or assignments found.</p>
-          <p className="mt-1 text-xs">Events with keywords like "deadline", "homework", or "assignment" will appear here.</p>
+          <p className="mt-1 text-xs">Events with keywords like &quot;deadline&quot;, &quot;homework&quot;, or &quot;assignment&quot; will appear here.</p>
         </div>
       ) : (
         <>

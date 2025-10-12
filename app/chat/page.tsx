@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import Hero from "@/components/Hero";
 import Sources from "@/components/Sources";
 import ChatHistory from "@/components/ChatHistory";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import {
   createParser,
   ParsedEvent,
@@ -16,7 +16,9 @@ import { supabase } from '@/utils/supabase';
 import { getSystemPrompt } from "@/utils/utils";
 import Chat from "@/components/Chat";
 
-export default function ChatPage() {
+export const dynamic = 'force-dynamic';
+
+function ChatPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [inputValue, setInputValue] = useState("");
@@ -122,7 +124,7 @@ export default function ChatPage() {
         }));
 
         // Extract topic from first user message
-        const firstUserMessage = loadedMessages.find(m => m.role === 'user');
+        const firstUserMessage = loadedMessages.find((m: { role: string; }) => m.role === 'user');
         if (firstUserMessage) {
           setTopic(firstUserMessage.content);
         }
@@ -153,12 +155,12 @@ export default function ChatPage() {
       if (!messagesToSave || messagesToSave.length === 0) return;
 
       // Filter out system messages and only save user/assistant messages
-      const messagesToStore = messagesToSave.filter(m => m && m.role && m.role !== 'system');
+      const messagesToStore = messagesToSave.filter((m: { role: string; }) => m && m.role && m.role !== 'system');
       if (messagesToStore.length === 0) return;
 
       if (!currentSessionId) {
         // Create new session
-        const firstUserMessage = messagesToStore.find(m => m.role === 'user')?.content || 'New Chat';
+        const firstUserMessage = messagesToStore.find((m: { role: string; }) => m.role === 'user')?.content || 'New Chat';
         const title = firstUserMessage.substring(0, 50) + (firstUserMessage.length > 50 ? '...' : '');
 
         const { data: { session } } = await supabase.auth.getSession();
@@ -269,7 +271,7 @@ export default function ChatPage() {
         return;
       }
       const errorText = await chatRes.text();
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${errorText}` }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${errorText}` }] as { role: string; content: string }[]);
       return;
     }
 
@@ -305,7 +307,7 @@ export default function ChatPage() {
                 { ...lastMessage, content: lastMessage.content + text },
               ];
             } else {
-              return [...prev, { role: "assistant", content: text }];
+              return [...prev, { role: "assistant", content: text }] as { role: string; content: string }[];
             }
           });
         } catch (e) {
@@ -549,5 +551,21 @@ export default function ChatPage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <>
+        <Header />
+        <main className="flex grow items-center justify-center">
+          <div className="text-gray-600">Loading...</div>
+        </main>
+        <Footer />
+      </>
+    }>
+      <ChatPageContent />
+    </Suspense>
   );
 }

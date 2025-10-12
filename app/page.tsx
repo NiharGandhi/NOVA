@@ -4,11 +4,13 @@ import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import CalendarEvents from "@/components/CalendarEvents";
 import StudyPlan from "@/components/StudyPlan";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+function HomeContent() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
@@ -179,5 +181,21 @@ export default function Home() {
 
       <Footer />
     </>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <>
+        <Header />
+        <main className="flex grow items-center justify-center">
+          <div className="text-gray-600">Loading...</div>
+        </main>
+        <Footer />
+      </>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }

@@ -158,7 +158,7 @@ export default function StudyPlan() {
             </svg>
           </div>
           <p className="text-sm text-gray-600">
-            Click "Generate Plan" to create an AI-powered study schedule
+            Click &quot;Generate Plan&quot; to create an AI-powered study schedule
           </p>
           <p className="mt-2 text-xs text-gray-500">
             The AI will analyze your calendar events and create an optimal plan
