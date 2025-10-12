@@ -63,10 +63,10 @@ const InitialInputArea: FC<TInputAreaProps> = ({
           </select>
         </div>
       )}
-      <div className="flex w-full rounded-lg border">
+      <div className="flex w-full items-center gap-2">
         <textarea
           placeholder="Teach me about..."
-          className="block w-full resize-none rounded-l-lg border-r p-6 text-sm text-gray-900 placeholder:text-gray-400 sm:text-base"
+          className="block w-full resize-none rounded-lg border p-6 text-sm text-gray-900 placeholder:text-gray-400 sm:text-base"
           disabled={disabled}
           value={promptValue}
           required
@@ -74,44 +74,27 @@ const InitialInputArea: FC<TInputAreaProps> = ({
           onChange={(e) => setPromptValue(e.target.value)}
           rows={1}
         />
-        <div className="flex items-center justify-center">
-          <select
-            id="grade"
-            name="grade"
-            className="ring-none h-full rounded-md rounded-r-lg border-0 bg-transparent px-2 text-sm font-medium text-black focus:ring-0 sm:text-base"
-            value={ageGroup}
-            onChange={(e) => setAgeGroup(e.target.value)}
-          >
-            <option>Elementary School</option>
-            <option>Middle School</option>
-            <option>High School</option>
-            <option>College</option>
-            <option>Undergrad</option>
-            <option>Graduate</option>
-          </select>
-        </div>
-      </div>
-      <button
-        disabled={disabled}
-        type="submit"
-        className="relative flex size-[72px] w-[358px] shrink-0 items-center justify-center rounded-md bg-[linear-gradient(154deg,#FF6B00_23.37%,#FF8533_91.91%)] disabled:pointer-events-none disabled:opacity-75 sm:ml-3 sm:w-[72px]"
-      >
-        {disabled && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <TypeAnimation />
-          </div>
-        )}
+        <button
+          disabled={disabled}
+          type="submit"
+          className="relative flex size-[72px] shrink-0 items-center justify-center rounded-md bg-[linear-gradient(154deg,#FF6B00_23.37%,#FF8533_91.91%)] disabled:pointer-events-none disabled:opacity-75"
+        >
+          {disabled && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <TypeAnimation />
+            </div>
+          )}
 
-        <Image
-          unoptimized
-          src={"/up-arrow.svg"}
-          alt="search"
-          width={24}
-          height={24}
-          className={disabled ? "invisible" : ""}
-        />
-        <span className="ml-2 font-bold text-white sm:hidden">Search</span>
-      </button>
+          <Image
+            unoptimized
+            src={"/up-arrow.svg"}
+            alt="search"
+            width={24}
+            height={24}
+            className={disabled ? "invisible" : ""}
+          />
+        </button>
+      </div>
     </form>
   );
 };
