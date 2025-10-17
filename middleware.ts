@@ -37,10 +37,15 @@ export async function middleware(request: NextRequest) {
     const authHeader = request.headers.get('Authorization')
     const token = authHeader?.split('Bearer ')[1]
 
-    // For API routes, check the auth token (except OAuth callback)
+    // For API routes, check the auth token (except OAuth callback and LTI endpoints)
     if (request.nextUrl.pathname.startsWith('/api/')) {
       // Skip auth check for OAuth callback route (called by Google)
       if (request.nextUrl.pathname === '/api/calendar/callback') {
+        return response;
+      }
+
+      // Skip auth check for LTI endpoints (called by LMS platforms)
+      if (request.nextUrl.pathname.startsWith('/api/lti/')) {
         return response;
       }
 

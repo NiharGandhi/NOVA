@@ -71,26 +71,33 @@ export default function LMSIntegration() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Load platforms
-      const { data: platformsData, error: platformsError } = await supabase
-        .from('lti_platforms')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Load platforms via API
+      const platformsResponse = await fetch('/api/lti/platforms', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
 
-      if (platformsError) throw platformsError;
-      setPlatforms(platformsData || []);
+      if (platformsResponse.ok) {
+        const platformsData = await platformsResponse.json();
+        setPlatforms(platformsData || []);
+      } else {
+        console.error('Failed to load platforms:', await platformsResponse.text());
+      }
 
-      // Load contexts
-      const { data: contextsData, error: contextsError } = await supabase
-        .from('lti_contexts')
-        .select(`
-          *,
-          platform:lti_platforms(name)
-        `)
-        .order('created_at', { ascending: false });
+      // Load contexts via API
+      const contextsResponse = await fetch('/api/lti/contexts', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
 
-      if (contextsError) throw contextsError;
-      setContexts(contextsData as any || []);
+      if (contextsResponse.ok) {
+        const contextsData = await contextsResponse.json();
+        setContexts(contextsData || []);
+      } else {
+        console.error('Failed to load contexts:', await contextsResponse.text());
+      }
     } catch (error) {
       console.error('Error loading LMS data:', error);
     } finally {
@@ -105,10 +112,14 @@ export default function LMSIntegration() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // First, create the platform
-      const { data: platform, error: platformError } = await supabase
-        .from('lti_platforms')
-        .insert({
+      // Create the platform via API
+      const response = await fetch('/api/lti/platforms', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: platformName,
           platform_type: platformType,
           issuer,
@@ -119,25 +130,12 @@ export default function LMSIntegration() {
           deployment_id: deploymentId || null,
           nrps_endpoint: nrpsEndpoint || null,
           auto_provision_users: autoProvision,
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (platformError) throw platformError;
-
-      // Generate RSA key pair for this platform
-      const response = await fetch('/api/lti/platforms/generate-key', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ platformId: platform.id }),
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate key pair');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add platform');
       }
 
       alert('Platform added successfully! Make sure to configure your LMS with the NOVA LTI credentials.');
@@ -156,7 +154,7 @@ export default function LMSIntegration() {
       loadData();
     } catch (error) {
       console.error('Error adding platform:', error);
-      alert('Failed to add platform. Check console for details.');
+      alert('Failed to add platform: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -199,15 +197,29 @@ export default function LMSIntegration() {
 
   const handleTogglePlatform = async (platformId: string, isActive: boolean) => {
     try {
-      const { error } = await supabase
-        .from('lti_platforms')
-        .update({ is_active: !isActive })
-        .eq('id', platformId);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      if (error) throw error;
+      const response = await fetch('/api/lti/platforms', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: platformId,
+          is_active: !isActive,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle platform');
+      }
+
       loadData();
     } catch (error) {
       console.error('Error toggling platform:', error);
+      alert('Failed to toggle platform status');
     }
   };
 
