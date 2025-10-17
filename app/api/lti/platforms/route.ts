@@ -208,3 +208,55 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE - Delete a platform (admin only)
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.headers.get('x-user-id');
+
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    // Check if user is admin
+    const { data: user } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (user?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { id } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Platform ID required' }, { status: 400 });
+    }
+
+    // Delete platform (cascade will delete related records)
+    const { error } = await supabase
+      .from('lti_platforms')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting platform:', error);
+      return NextResponse.json({ error: 'Failed to delete platform' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Platforms DELETE error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

@@ -135,7 +135,14 @@ export default function LMSIntegration() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to add platform');
+        const errorMessage = error.error || 'Failed to add platform';
+
+        // Check for duplicate issuer
+        if (errorMessage.includes('duplicate key') && errorMessage.includes('issuer')) {
+          throw new Error('A platform with this Issuer URL already exists. Please check your existing platforms or use a different issuer URL.');
+        }
+
+        throw new Error(errorMessage);
       }
 
       alert('Platform added successfully! Make sure to configure your LMS with the NOVA LTI credentials.');
@@ -220,6 +227,37 @@ export default function LMSIntegration() {
     } catch (error) {
       console.error('Error toggling platform:', error);
       alert('Failed to toggle platform status');
+    }
+  };
+
+  const handleDeletePlatform = async (platformId: string, platformName: string) => {
+    if (!confirm(`Are you sure you want to delete "${platformName}"? This will also delete all associated contexts, enrollments, and sync data.`)) {
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/lti/platforms', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: platformId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete platform');
+      }
+
+      alert('Platform deleted successfully');
+      loadData();
+    } catch (error) {
+      console.error('Error deleting platform:', error);
+      alert('Failed to delete platform: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -419,12 +457,20 @@ export default function LMSIntegration() {
                     <p className="mt-1 text-sm text-gray-600">{platform.issuer}</p>
                     <p className="mt-1 text-xs text-gray-500">Client ID: {platform.client_id}</p>
                   </div>
-                  <button
-                    onClick={() => handleTogglePlatform(platform.id, platform.is_active)}
-                    className="text-sm text-orange-600 hover:text-orange-700"
-                  >
-                    {platform.is_active ? 'Deactivate' : 'Activate'}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleTogglePlatform(platform.id, platform.is_active)}
+                      className="text-sm text-orange-600 hover:text-orange-700"
+                    >
+                      {platform.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      onClick={() => handleDeletePlatform(platform.id, platform.name)}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
