@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         fullName: userInfo.fullName,
       });
 
-      // Create auth user
+      // Try to create auth user
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email: userEmail,
         email_confirm: true,
@@ -156,7 +156,40 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      if (authError) {
+      // If user already exists, look them up
+      if (authError && authError.message.includes('already been registered')) {
+        console.log('User already exists, looking up by email:', userEmail);
+
+        const { data: existingUsers, error: lookupError } = await supabase.auth.admin.listUsers();
+
+        if (lookupError) {
+          console.error('Failed to lookup existing user:', lookupError);
+          return NextResponse.json(
+            {
+              error: 'Failed to provision user - user exists but lookup failed',
+              details: lookupError.message,
+            },
+            { status: 500 }
+          );
+        }
+
+        // Find the user by email
+        const foundUser = existingUsers.users.find(u => u.email === userEmail);
+
+        if (!foundUser) {
+          console.error('User exists but could not find by email');
+          return NextResponse.json(
+            {
+              error: 'Failed to provision user - user exists but not found',
+              email: userEmail,
+            },
+            { status: 500 }
+          );
+        }
+
+        novaUser = foundUser;
+        console.log('Found existing user:', novaUser.id, novaUser.email);
+      } else if (authError) {
         console.error('Failed to create auth user:', authError);
         console.error('User info:', userInfo);
         return NextResponse.json(
@@ -168,18 +201,16 @@ export async function POST(request: NextRequest) {
           },
           { status: 500 }
         );
-      }
-
-      if (!authUser.user) {
+      } else if (!authUser.user) {
         console.error('No user returned from createUser');
         return NextResponse.json(
           { error: 'Failed to provision user - no user returned' },
           { status: 500 }
         );
+      } else {
+        novaUser = authUser.user;
+        console.log('Created auth user:', novaUser.id, novaUser.email);
       }
-
-      novaUser = authUser.user;
-      console.log('Created auth user:', novaUser.id, novaUser.email);
 
       // Check if user record exists (should be auto-created by trigger)
       const { data: existingUserRecord } = await supabase
