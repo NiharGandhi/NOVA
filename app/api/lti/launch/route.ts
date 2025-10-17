@@ -388,10 +388,10 @@ export async function POST(request: NextRequest) {
         console.log('Got hashed token, verifying...');
 
         // Verify the OTP using the hashed token
+        // Note: When using token_hash, we should NOT pass email
         const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
-          type: 'magiclink',
+          type: 'email',
           token_hash: hashedToken,
-          email: novaUser.email!,
         });
 
         if (verifyError || !sessionData?.session) {
