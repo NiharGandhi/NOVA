@@ -133,9 +133,18 @@ export async function POST(request: NextRequest) {
       novaUser = existingMapping.users;
     } else if (platform.auto_provision_users) {
       // Auto-provision new user
+      // Generate email if not provided by LMS
+      const userEmail = userInfo.email || `${userInfo.userId}@lti.${platform.platform_type}.edu`;
+
+      console.log('Provisioning new user:', {
+        ltiUserId: userInfo.userId,
+        email: userEmail,
+        fullName: userInfo.fullName,
+      });
+
       // Create auth user
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email: userInfo.email || `${userInfo.userId}@lti.${platform.platform_type}.edu`,
+        email: userEmail,
         email_confirm: true,
         user_metadata: {
           full_name: userInfo.fullName,
@@ -143,30 +152,67 @@ export async function POST(request: NextRequest) {
           family_name: userInfo.familyName,
           lti_user: true,
           platform_id: platform.id,
+          lti_user_id: userInfo.userId,
         },
       });
 
       if (authError) {
         console.error('Failed to create auth user:', authError);
+        console.error('User info:', userInfo);
         return NextResponse.json(
-          { error: 'Failed to provision user' },
+          {
+            error: 'Failed to provision user',
+            details: authError.message,
+            user_id: userInfo.userId,
+            email: userEmail,
+          },
+          { status: 500 }
+        );
+      }
+
+      if (!authUser.user) {
+        console.error('No user returned from createUser');
+        return NextResponse.json(
+          { error: 'Failed to provision user - no user returned' },
           { status: 500 }
         );
       }
 
       novaUser = authUser.user;
+      console.log('Created auth user:', novaUser.id, novaUser.email);
 
-      // Update user role in users table
-      await supabase
+      // Check if user record exists (should be auto-created by trigger)
+      const { data: existingUserRecord } = await supabase
         .from('users')
-        .update({ role: novaRole })
-        .eq('id', novaUser!.id);
+        .select('*')
+        .eq('id', novaUser.id)
+        .single();
+
+      if (!existingUserRecord) {
+        // Trigger didn't work, create manually
+        console.log('User record not found, creating manually');
+        await supabase
+          .from('users')
+          .insert({
+            id: novaUser.id,
+            email: novaUser.email!,
+            role: novaRole,
+          });
+      } else {
+        // Update role if needed
+        if (existingUserRecord.role !== novaRole) {
+          await supabase
+            .from('users')
+            .update({ role: novaRole })
+            .eq('id', novaUser.id);
+        }
+      }
 
       // Create user mapping
-      await supabase.from('lti_user_mappings').insert({
+      const { error: mappingError } = await supabase.from('lti_user_mappings').insert({
         platform_id: platform.id,
         lti_user_id: userInfo.userId,
-        nova_user_id: novaUser!.id,
+        nova_user_id: novaUser.id,
         email: userInfo.email,
         given_name: userInfo.givenName,
         family_name: userInfo.familyName,
@@ -175,7 +221,11 @@ export async function POST(request: NextRequest) {
         lms_user_data: payload,
       });
 
-      console.log('Provisioned new user:', novaUser!.email);
+      if (mappingError) {
+        console.error('Failed to create user mapping:', mappingError);
+      }
+
+      console.log('Provisioned new user:', novaUser.email);
     } else {
       return NextResponse.json(
         { error: 'User not found and auto-provisioning is disabled' },
