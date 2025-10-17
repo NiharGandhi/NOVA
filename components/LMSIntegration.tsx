@@ -261,6 +261,36 @@ export default function LMSIntegration() {
     }
   };
 
+  const handleGenerateKeys = async (platformId: string, platformName: string) => {
+    if (!confirm(`Generate new RSA keys for "${platformName}"? This will deactivate old keys.`)) {
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`/api/lti/platforms/${platformId}/keys`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to generate keys');
+      }
+
+      const result = await response.json();
+      alert(`Keys generated successfully!\nKey ID: ${result.key_id}`);
+    } catch (error) {
+      console.error('Error generating keys:', error);
+      alert('Failed to generate keys: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
+
   if (loading) {
     return <div className="text-gray-600">Loading LMS integration...</div>;
   }
@@ -458,6 +488,13 @@ export default function LMSIntegration() {
                     <p className="mt-1 text-xs text-gray-500">Client ID: {platform.client_id}</p>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => handleGenerateKeys(platform.id, platform.name)}
+                      className="text-sm text-blue-600 hover:text-blue-700"
+                      title="Generate RSA keys for this platform"
+                    >
+                      Generate Keys
+                    </button>
                     <button
                       onClick={() => handleTogglePlatform(platform.id, platform.is_active)}
                       className="text-sm text-orange-600 hover:text-orange-700"
