@@ -106,17 +106,25 @@ export async function generateLTIKeyPair(): Promise<{
   privateKey: string;
   keyId: string;
 }> {
-  const { publicKey, privateKey } = await jose.generateKeyPair('RS256', {
+  // Use Node.js crypto module instead of jose for key generation
+  // This ensures keys are extractable and works in all environments
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
+    publicKeyEncoding: {
+      type: 'spki',
+      format: 'pem',
+    },
+    privateKeyEncoding: {
+      type: 'pkcs8',
+      format: 'pem',
+    },
   });
 
-  const publicKeyPEM = await jose.exportSPKI(publicKey);
-  const privateKeyPEM = await jose.exportPKCS8(privateKey);
   const keyId = crypto.randomBytes(16).toString('hex');
 
   return {
-    publicKey: publicKeyPEM,
-    privateKey: privateKeyPEM,
+    publicKey,
+    privateKey,
     keyId,
   };
 }
