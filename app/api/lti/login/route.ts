@@ -26,9 +26,10 @@ export async function POST(request: NextRequest) {
 
     console.log('LTI Login Initiation:', { iss, client_id, lti_deployment_id });
 
+    // Use service role key to bypass RLS
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // Find the LTI platform by issuer
