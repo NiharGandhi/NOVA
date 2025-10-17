@@ -278,80 +278,63 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', session.id);
 
-    // Create a NOVA session for the user using admin generateLink
+    // Create a NOVA session for the user
     if (novaUser) {
-      // Generate a magic link for the user (this creates a token we can use)
-      const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-        type: 'magiclink',
-        email: novaUser.email!,
-      });
+      try {
+        // Create a one-time token for the user
+        const { data: tokenData, error: tokenError } = await supabase.auth.admin.generateLink({
+          type: 'magiclink',
+          email: novaUser.email!,
+        });
 
-      if (linkError || !linkData) {
-        console.error('Failed to generate auth link:', linkError);
+        if (tokenError) {
+          console.error('Token generation error:', tokenError);
+          throw tokenError;
+        }
+
+        // Extract the token from the URL
+        const actionLink = tokenData.properties.action_link;
+        const url = new URL(actionLink);
+        const tokenHash = url.searchParams.get('token_hash');
+
+        if (!tokenHash) {
+          console.error('No token hash in magic link:', actionLink);
+          throw new Error('Failed to extract authentication token');
+        }
+
+        // Verify the OTP to create a session
+        const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
+          type: 'magiclink',
+          token_hash: tokenHash,
+          email: novaUser.email!,
+        });
+
+        if (sessionError || !sessionData?.session) {
+          console.error('Session verification error:', sessionError);
+          throw sessionError || new Error('No session returned');
+        }
+
+        // Create redirect URL with authentication token as query param
+        // We'll use a custom callback page to set the session
+        const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_APP_URL}/api/lti/callback`);
+        callbackUrl.searchParams.set('access_token', sessionData.session.access_token);
+        callbackUrl.searchParams.set('refresh_token', sessionData.session.refresh_token);
+        callbackUrl.searchParams.set('expires_in', String(sessionData.session.expires_in));
+
+        return NextResponse.redirect(callbackUrl.toString());
+      } catch (authError) {
+        console.error('Authentication error:', authError);
+        console.error('User email:', novaUser.email);
+
         return NextResponse.json(
-          { error: 'Failed to create user session' },
+          {
+            error: 'Failed to create user session',
+            details: authError instanceof Error ? authError.message : 'Unknown error',
+            user_email: novaUser.email,
+          },
           { status: 500 }
         );
       }
-
-      // Extract the hashed token from the generated URL
-      const url = new URL(linkData.properties.action_link);
-      const token = url.searchParams.get('token');
-      const tokenHash = url.searchParams.get('token_hash');
-
-      if (!token || !tokenHash) {
-        console.error('Failed to extract token from magic link');
-        return NextResponse.json(
-          { error: 'Failed to create user session' },
-          { status: 500 }
-        );
-      }
-
-      // Verify the token to get a session
-      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
-        type: 'magiclink',
-        token_hash: tokenHash,
-        email: novaUser.email!,
-      });
-
-      if (verifyError || !verifyData.session) {
-        console.error('Failed to verify token:', verifyError);
-        return NextResponse.json(
-          { error: 'Failed to create user session' },
-          { status: 500 }
-        );
-      }
-
-      // Redirect to NOVA app with session
-      const response = NextResponse.redirect(
-        `${process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin}/home?lti_launch=true`
-      );
-
-      // Set session cookies using Supabase's cookie handling
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        path: '/',
-      };
-
-      // Set access token
-      response.cookies.set({
-        name: 'sb-access-token',
-        value: verifyData.session.access_token,
-        ...cookieOptions,
-        maxAge: verifyData.session.expires_in || 3600,
-      });
-
-      // Set refresh token
-      response.cookies.set({
-        name: 'sb-refresh-token',
-        value: verifyData.session.refresh_token,
-        ...cookieOptions,
-        maxAge: 60 * 60 * 24 * 7, // 7 days
-      });
-
-      return response;
     }
 
     return NextResponse.json({ error: 'Failed to process launch' }, { status: 500 });
