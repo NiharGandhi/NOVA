@@ -81,7 +81,7 @@ const Header = () => {
 
   return (
     <div className="container flex h-[60px] shrink-0 items-center justify-between px-4 lg:h-[80px] lg:px-0">
-      <Link href="/" className="hover:opacity-80">
+      <Link href="/home" className="hover:opacity-80">
         <Logo className="w-30 sm:w-36" />
       </Link>
       <div className="flex items-center gap-4">
