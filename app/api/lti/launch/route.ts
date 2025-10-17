@@ -278,14 +278,44 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', session.id);
 
-    // Create a NOVA session for the user
+    // Create a NOVA session for the user using admin generateLink
     if (novaUser) {
-      const { data: sessionData, error: sessionError } = await supabase.auth.admin.createSession({
-        user_id: novaUser.id,
+      // Generate a magic link for the user (this creates a token we can use)
+      const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email: novaUser.email!,
       });
 
-      if (sessionError) {
-        console.error('Failed to create session:', sessionError);
+      if (linkError || !linkData) {
+        console.error('Failed to generate auth link:', linkError);
+        return NextResponse.json(
+          { error: 'Failed to create user session' },
+          { status: 500 }
+        );
+      }
+
+      // Extract the hashed token from the generated URL
+      const url = new URL(linkData.properties.action_link);
+      const token = url.searchParams.get('token');
+      const tokenHash = url.searchParams.get('token_hash');
+
+      if (!token || !tokenHash) {
+        console.error('Failed to extract token from magic link');
+        return NextResponse.json(
+          { error: 'Failed to create user session' },
+          { status: 500 }
+        );
+      }
+
+      // Verify the token to get a session
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        type: 'magiclink',
+        token_hash: tokenHash,
+        email: novaUser.email!,
+      });
+
+      if (verifyError || !verifyData.session) {
+        console.error('Failed to verify token:', verifyError);
         return NextResponse.json(
           { error: 'Failed to create user session' },
           { status: 500 }
@@ -297,25 +327,28 @@ export async function POST(request: NextRequest) {
         `${process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin}/home?lti_launch=true`
       );
 
-      // Set session cookies
+      // Set session cookies using Supabase's cookie handling
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+      };
+
+      // Set access token
       response.cookies.set({
         name: 'sb-access-token',
-        value: sessionData.access_token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: sessionData.expires_in,
-        path: '/',
+        value: verifyData.session.access_token,
+        ...cookieOptions,
+        maxAge: verifyData.session.expires_in || 3600,
       });
 
+      // Set refresh token
       response.cookies.set({
         name: 'sb-refresh-token',
-        value: sessionData.refresh_token,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        value: verifyData.session.refresh_token,
+        ...cookieOptions,
         maxAge: 60 * 60 * 24 * 7, // 7 days
-        path: '/',
       });
 
       return response;
