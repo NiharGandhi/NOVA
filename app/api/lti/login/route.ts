@@ -40,9 +40,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error || !platform) {
-      console.error('Platform not found:', error);
+      console.error('Platform not found for issuer:', iss);
+      console.error('Error:', error);
+
+      // Also log all platforms to help debug
+      const { data: allPlatforms } = await supabase
+        .from('lti_platforms')
+        .select('issuer, name, is_active');
+      console.log('Available platforms:', allPlatforms);
+
       return NextResponse.json(
-        { error: 'LTI platform not registered or inactive' },
+        {
+          error: 'LTI platform not registered or inactive',
+          details: `Received issuer: ${iss}. Please make sure this matches exactly with the Issuer URL configured in NOVA.`
+        },
         { status: 404 }
       );
     }
