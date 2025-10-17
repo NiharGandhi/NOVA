@@ -362,41 +362,38 @@ export async function POST(request: NextRequest) {
     // Create a NOVA session for the user
     if (novaUser) {
       try {
-        // Create a one-time token for the user
-        const { data: tokenData, error: tokenError } = await supabase.auth.admin.generateLink({
-          type: 'magiclink',
+        console.log('Creating session for user:', novaUser.email);
+
+        // Use a simpler approach: set a temporary password and sign in
+        const tempPassword = `lti_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+
+        // Update user with temporary password
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          novaUser.id,
+          { password: tempPassword }
+        );
+
+        if (updateError) {
+          console.error('Failed to set temporary password:', updateError);
+          throw updateError;
+        }
+
+        console.log('Set temporary password for user');
+
+        // Sign in with the temporary password to create a session
+        const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
           email: novaUser.email!,
+          password: tempPassword,
         });
 
-        if (tokenError) {
-          console.error('Token generation error:', tokenError);
-          throw tokenError;
+        if (signInError || !sessionData?.session) {
+          console.error('Sign in error:', signInError);
+          throw signInError || new Error('No session created');
         }
 
-        // Extract the token from the URL
-        const actionLink = tokenData.properties.action_link;
-        const url = new URL(actionLink);
-        const tokenHash = url.searchParams.get('token_hash');
+        console.log('Session created successfully');
 
-        if (!tokenHash) {
-          console.error('No token hash in magic link:', actionLink);
-          throw new Error('Failed to extract authentication token');
-        }
-
-        // Verify the OTP to create a session
-        const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
-          type: 'magiclink',
-          token_hash: tokenHash,
-          email: novaUser.email!,
-        });
-
-        if (sessionError || !sessionData?.session) {
-          console.error('Session verification error:', sessionError);
-          throw sessionError || new Error('No session returned');
-        }
-
-        // Create redirect URL with authentication token as query param
-        // We'll use a custom callback page to set the session
+        // Create redirect URL with authentication tokens as query params
         const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_APP_URL}/api/lti/callback`);
         callbackUrl.searchParams.set('access_token', sessionData.session.access_token);
         callbackUrl.searchParams.set('refresh_token', sessionData.session.refresh_token);
@@ -406,6 +403,7 @@ export async function POST(request: NextRequest) {
       } catch (authError) {
         console.error('Authentication error:', authError);
         console.error('User email:', novaUser.email);
+        console.error('Stack:', authError instanceof Error ? authError.stack : 'N/A');
 
         return NextResponse.json(
           {
