@@ -484,7 +484,7 @@ export default function LMSIntegration() {
           </li>
           <li>Enable Names and Role Provisioning Service (NRPS) in your LMS</li>
           <li>Launch NOVA from your LMS course to establish the connection</li>
-          <li>Use "Sync Now" to pull student roster and enrollments</li>
+          <li>Use &quot;Sync Now&quot; to pull student roster and enrollments</li>
         </ol>
       </div>
     </div>
