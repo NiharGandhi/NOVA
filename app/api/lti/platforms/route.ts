@@ -125,33 +125,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate RSA key pair for this platform
-    const { publicKey, privateKey, keyId } = await generateLTIKeyPair();
+    try {
+      const { publicKey, privateKey, keyId } = await generateLTIKeyPair();
 
-    // Store key pair
-    const { error: keyError } = await supabase
-      .from('lti_keys')
-      .insert({
-        platform_id: platform.id,
-        key_id: keyId,
-        public_key: publicKey,
-        private_key: privateKey,
-        algorithm: 'RS256',
-        is_active: true,
-      });
+      // Store key pair
+      const { error: keyError } = await supabase
+        .from('lti_keys')
+        .insert({
+          platform_id: platform.id,
+          key_id: keyId,
+          public_key: publicKey,
+          private_key: privateKey,
+          algorithm: 'RS256',
+          is_active: true,
+        });
 
-    if (keyError) {
-      console.error('Error storing key pair:', keyError);
-      // Don't fail the request, but log the error
+      if (keyError) {
+        console.error('Error storing key pair:', keyError);
+        // Don't fail the request, but log the error
+        return NextResponse.json({
+          ...platform,
+          warning: 'Platform created but key generation failed',
+        });
+      }
+    } catch (keyGenError) {
+      console.error('Key generation error:', keyGenError);
+      // Continue without keys - can generate later
       return NextResponse.json({
         ...platform,
-        warning: 'Platform created but key generation failed',
+        warning: 'Platform created but key generation failed: ' + (keyGenError instanceof Error ? keyGenError.message : 'Unknown error'),
       });
     }
 
     return NextResponse.json(platform);
   } catch (error) {
     console.error('Platforms POST error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({
+      error: 'Internal server error',
+      details: errorMessage
+    }, { status: 500 });
   }
 }
 
