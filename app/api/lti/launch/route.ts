@@ -402,15 +402,11 @@ export async function POST(request: NextRequest) {
         console.log('Session created successfully');
 
         // Create redirect URL with authentication tokens as query params
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
-        console.log('Using base URL:', baseUrl);
-
-        const callbackUrl = new URL('/api/lti/callback', baseUrl);
+        const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_APP_URL}/api/lti/callback`);
         callbackUrl.searchParams.set('access_token', sessionData.session.access_token);
         callbackUrl.searchParams.set('refresh_token', sessionData.session.refresh_token);
         callbackUrl.searchParams.set('expires_in', String(sessionData.session.expires_in));
 
-        console.log('Redirecting to:', callbackUrl.toString());
         return NextResponse.redirect(callbackUrl.toString());
       } catch (authError) {
         console.error('Authentication error:', authError);
