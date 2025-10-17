@@ -364,31 +364,39 @@ export async function POST(request: NextRequest) {
       try {
         console.log('Creating session for user:', novaUser.email);
 
-        // Use a simpler approach: set a temporary password and sign in
-        const tempPassword = `lti_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-
-        // Update user with temporary password
-        const { error: updateError } = await supabase.auth.admin.updateUserById(
-          novaUser.id,
-          { password: tempPassword }
-        );
-
-        if (updateError) {
-          console.error('Failed to set temporary password:', updateError);
-          throw updateError;
-        }
-
-        console.log('Set temporary password for user');
-
-        // Sign in with the temporary password to create a session
-        const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+        // Generate a magic link to create a session token
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'magiclink',
           email: novaUser.email!,
-          password: tempPassword,
         });
 
-        if (signInError || !sessionData?.session) {
-          console.error('Sign in error:', signInError);
-          throw signInError || new Error('No session created');
+        if (linkError || !linkData) {
+          console.error('Failed to generate magic link:', linkError);
+          throw linkError || new Error('No link data returned');
+        }
+
+        console.log('Generated magic link successfully');
+
+        // The hashed_token from generateLink can be used to verify OTP
+        const hashedToken = linkData.properties.hashed_token;
+
+        if (!hashedToken) {
+          console.error('No hashed_token in link data');
+          throw new Error('Missing hashed_token from generated link');
+        }
+
+        console.log('Got hashed token, verifying...');
+
+        // Verify the OTP using the hashed token
+        const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
+          type: 'magiclink',
+          token_hash: hashedToken,
+          email: novaUser.email!,
+        });
+
+        if (verifyError || !sessionData?.session) {
+          console.error('Failed to verify OTP:', verifyError);
+          throw verifyError || new Error('No session created from OTP verification');
         }
 
         console.log('Session created successfully');
