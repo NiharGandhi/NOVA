@@ -44,8 +44,15 @@ export async function middleware(request: NextRequest) {
         return response;
       }
 
-      // Skip auth check for LTI endpoints (called by LMS platforms)
-      if (request.nextUrl.pathname.startsWith('/api/lti/')) {
+      // Skip auth check for public LTI endpoints (called by LMS platforms)
+      // These are the endpoints that LMS platforms call directly
+      const publicLTIEndpoints = [
+        '/api/lti/login',
+        '/api/lti/launch',
+        '/api/lti/jwks',
+      ];
+
+      if (publicLTIEndpoints.some(endpoint => request.nextUrl.pathname === endpoint)) {
         return response;
       }
 
