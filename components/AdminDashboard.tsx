@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/utils/supabase'
 import type { AIRestriction } from '@/utils/aiConfig'
+import LMSIntegration from './LMSIntegration'
 
 interface ResponseTemplate {
   id: string;
@@ -54,7 +55,7 @@ export default function AdminDashboard() {
 
   const [newBlockedTopic, setNewBlockedTopic] = useState('')
   const [message, setMessage] = useState('')
-  const [activeTab, setActiveTab] = useState('general') // 'general', 'templates', 'chatbots', 'materials', or 'instructors'
+  const [activeTab, setActiveTab] = useState('general') // 'general', 'templates', 'chatbots', 'materials', 'instructors', or 'lms'
 
   // Chatbot management state
   const [chatbots, setChatbots] = useState<any[]>([])
@@ -591,6 +592,16 @@ export default function AdminDashboard() {
             }`}
           >
             Instructors
+          </button>
+          <button
+            onClick={() => setActiveTab('lms')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'lms'
+                ? 'border-orange-500 text-orange-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            LMS Integration
           </button>
         </nav>
       </div>
@@ -1518,6 +1529,8 @@ export default function AdminDashboard() {
               </div>
             </div>
           </>
+        ) : activeTab === 'lms' ? (
+          <LMSIntegration />
         ) : null}
 
         {message && (
