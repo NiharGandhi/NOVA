@@ -50,6 +50,7 @@ export async function middleware(request: NextRequest) {
         '/api/lti/login',
         '/api/lti/launch',
         '/api/lti/jwks',
+        '/api/lti/callback',
       ];
 
       if (publicLTIEndpoints.some(endpoint => request.nextUrl.pathname === endpoint)) {

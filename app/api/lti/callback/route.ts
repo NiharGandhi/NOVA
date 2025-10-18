@@ -21,8 +21,14 @@ export async function GET(request: NextRequest) {
 
     // Create response that redirects to home
     const response = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin}/home?lti_launch=true`
+      `${process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin}/home?lti_launch=true`,
+      { status: 302 } // Use 302 temporary redirect to prevent caching
     );
+
+    // Add cache control headers to prevent 304 responses
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
 
     const cookieOptions = {
       httpOnly: true,

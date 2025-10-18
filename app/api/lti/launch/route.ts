@@ -67,9 +67,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify and decode the JWT token
+    // Use the client_id from the session if available
+    const sessionClientId = session.launch_data?.client_id;
+
     let payload: LTILaunchPayload;
     try {
-      payload = await verifyLTIToken(id_token, platform);
+      payload = await verifyLTIToken(id_token, platform, sessionClientId);
     } catch (error) {
       console.error('Token verification failed:', error);
       return NextResponse.json(

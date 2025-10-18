@@ -59,13 +59,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate client_id if provided
-    if (client_id && platform.client_id !== client_id) {
-      return NextResponse.json(
-        { error: 'Client ID mismatch' },
-        { status: 400 }
-      );
-    }
+    // Use the client_id from the request if provided, otherwise use platform default
+    // This allows platforms to have multiple deployments with different client IDs
+    const effectiveClientId = client_id || platform.client_id;
 
     // Generate state and nonce for OIDC flow
     const state = generateState();
@@ -77,6 +73,7 @@ export async function POST(request: NextRequest) {
       state,
       nonce,
       platform_id: platform.id,
+      client_id: effectiveClientId,
       iss,
       login_hint,
       target_link_uri,
@@ -113,7 +110,8 @@ export async function POST(request: NextRequest) {
       state,
       nonce,
       redirectUri,
-      login_hint
+      login_hint,
+      effectiveClientId
     );
 
     console.log('Redirecting to LMS auth:', authUrl);

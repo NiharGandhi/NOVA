@@ -134,18 +134,17 @@ export async function generateLTIKeyPair(): Promise<{
  */
 export async function verifyLTIToken(
   token: string,
-  platform: LTIPlatform
+  platform: LTIPlatform,
+  clientId?: string
 ): Promise<LTILaunchPayload> {
   try {
     // Fetch JWKS from platform
-    const response = await fetch(platform.jwks_endpoint);
-    const jwks = await response.json();
     const JWKS = jose.createRemoteJWKSet(new URL(platform.jwks_endpoint));
 
     // Verify the token
     const { payload } = await jose.jwtVerify(token, JWKS, {
       issuer: platform.issuer,
-      audience: platform.client_id,
+      audience: clientId || platform.client_id,
     });
 
     return payload as unknown as LTILaunchPayload;
@@ -336,12 +335,13 @@ export function buildOIDCAuthUrl(
   state: string,
   nonce: string,
   redirectUri: string,
-  loginHint: string
+  loginHint: string,
+  clientId?: string
 ): string {
   const params = new URLSearchParams({
     response_type: 'id_token',
     response_mode: 'form_post',
-    client_id: platform.client_id,
+    client_id: clientId || platform.client_id,
     redirect_uri: redirectUri,
     scope: 'openid',
     state,
