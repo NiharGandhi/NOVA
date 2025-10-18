@@ -68,7 +68,18 @@ export async function GET(request: NextRequest) {
 
 // Handle POST requests (in case middleware or proxy converts GET to POST)
 export async function POST(request: NextRequest) {
-  // Redirect POST to GET handler by extracting body params
+  // First check if tokens are in query params (from redirect)
+  const searchParams = request.nextUrl.searchParams;
+  const accessToken = searchParams.get('access_token');
+  const refreshToken = searchParams.get('refresh_token');
+
+  // If tokens are in query params, just delegate to GET handler
+  if (accessToken && refreshToken) {
+    console.log('POST request with query params, delegating to GET handler');
+    return GET(request);
+  }
+
+  // Otherwise try to parse body
   try {
     const body = await request.json();
     const url = new URL(request.url);
@@ -90,12 +101,12 @@ export async function POST(request: NextRequest) {
       const formData = await request.formData();
       const url = new URL(request.url);
 
-      const accessToken = formData.get('access_token');
-      const refreshToken = formData.get('refresh_token');
+      const accessTokenForm = formData.get('access_token');
+      const refreshTokenForm = formData.get('refresh_token');
       const expiresIn = formData.get('expires_in');
 
-      if (accessToken) url.searchParams.set('access_token', accessToken.toString());
-      if (refreshToken) url.searchParams.set('refresh_token', refreshToken.toString());
+      if (accessTokenForm) url.searchParams.set('access_token', accessTokenForm.toString());
+      if (refreshTokenForm) url.searchParams.set('refresh_token', refreshTokenForm.toString());
       if (expiresIn) url.searchParams.set('expires_in', expiresIn.toString());
 
       const getRequest = new NextRequest(url, {
@@ -104,8 +115,9 @@ export async function POST(request: NextRequest) {
 
       return GET(getRequest);
     } catch (formError) {
+      console.error('Failed to parse POST request:', formError);
       return NextResponse.json(
-        { error: 'Invalid request format' },
+        { error: 'Invalid request format', details: 'Expected tokens in query params, JSON body, or form data' },
         { status: 400 }
       );
     }
