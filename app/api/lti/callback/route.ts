@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Disable static optimization for this route
+export const dynamic = 'force-dynamic';
+
 /**
  * LTI Callback Endpoint
  * Sets session cookies and redirects to home page
@@ -60,5 +63,51 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to set session' },
       { status: 500 }
     );
+  }
+}
+
+// Handle POST requests (in case middleware or proxy converts GET to POST)
+export async function POST(request: NextRequest) {
+  // Redirect POST to GET handler by extracting body params
+  try {
+    const body = await request.json();
+    const url = new URL(request.url);
+
+    // Add body params to URL if they exist
+    if (body.access_token) url.searchParams.set('access_token', body.access_token);
+    if (body.refresh_token) url.searchParams.set('refresh_token', body.refresh_token);
+    if (body.expires_in) url.searchParams.set('expires_in', body.expires_in);
+
+    // Create new request with GET method
+    const getRequest = new NextRequest(url, {
+      method: 'GET',
+    });
+
+    return GET(getRequest);
+  } catch (error) {
+    // If body parsing fails, try form data
+    try {
+      const formData = await request.formData();
+      const url = new URL(request.url);
+
+      const accessToken = formData.get('access_token');
+      const refreshToken = formData.get('refresh_token');
+      const expiresIn = formData.get('expires_in');
+
+      if (accessToken) url.searchParams.set('access_token', accessToken.toString());
+      if (refreshToken) url.searchParams.set('refresh_token', refreshToken.toString());
+      if (expiresIn) url.searchParams.set('expires_in', expiresIn.toString());
+
+      const getRequest = new NextRequest(url, {
+        method: 'GET',
+      });
+
+      return GET(getRequest);
+    } catch (formError) {
+      return NextResponse.json(
+        { error: 'Invalid request format' },
+        { status: 400 }
+      );
+    }
   }
 }
