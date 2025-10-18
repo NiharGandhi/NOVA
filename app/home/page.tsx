@@ -5,17 +5,20 @@ import Header from "@/components/Header";
 import CalendarEvents from "@/components/CalendarEvents";
 import StudyPlan from "@/components/StudyPlan";
 import { useState, useEffect, Suspense } from "react";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/utils/supabase';
 
 export const dynamic = 'force-dynamic';
 
 function HomeContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
   const [chatbots, setChatbots] = useState<any[]>([]);
+  const [ltiContext, setLtiContext] = useState<any>(null);
+  const [showLtiWelcome, setShowLtiWelcome] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -50,11 +53,19 @@ function HomeContent() {
         const role = userData?.role || 'student';
         setUserRole(role);
       }
+
+      // Check if this is an LTI launch
+      const ltiLaunch = searchParams.get('lti_launch');
+      if (ltiLaunch === 'true') {
+        setShowLtiWelcome(true);
+        // Fetch LTI context info
+        loadLtiContext(session.user.id);
+      }
     };
 
     checkAuth();
     loadChatbots();
-  }, [router]);
+  }, [router, searchParams]);
 
   const loadChatbots = async () => {
     try {
@@ -76,6 +87,38 @@ function HomeContent() {
     }
   };
 
+  const loadLtiContext = async (userId: string) => {
+    try {
+      // Get LTI user mapping and context info
+      const { data: mapping } = await supabase
+        .from('lti_user_mappings')
+        .select(`
+          *,
+          platform:lti_platforms(name, platform_type),
+          enrollments:lti_enrollments(
+            *,
+            context:lti_contexts(*)
+          )
+        `)
+        .eq('nova_user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (mapping) {
+        setLtiContext({
+          platform: mapping.platform,
+          lmsUserData: mapping.lms_user_data,
+          fullName: mapping.full_name,
+          lmsRoles: mapping.lms_roles,
+          enrollment: mapping.enrollments?.[0],
+        });
+      }
+    } catch (error) {
+      console.error('Error loading LTI context:', error);
+    }
+  };
+
   const handleChatbotClick = (chatbotId: string) => {
     router.push(`/chat?chatbot=${chatbotId}`);
   };
@@ -86,6 +129,46 @@ function HomeContent() {
 
       <main className="flex grow flex-col px-4 pb-4">
         <div className="mx-auto mt-4 flex max-w-7xl flex-col sm:mt-6">
+          {/* LTI Launch Welcome Banner */}
+          {showLtiWelcome && ltiContext && (
+            <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-blue-900">
+                    Connected via {ltiContext.platform?.name || 'LMS'}
+                  </h3>
+                  <p className="mt-1 text-sm text-blue-700">
+                    You're accessing NOVA from your LMS.
+                    {ltiContext.enrollment?.context?.context_title && (
+                      <> Course: <span className="font-medium">{ltiContext.enrollment.context.context_title}</span></>
+                    )}
+                  </p>
+                  {ltiContext.fullName && (
+                    <p className="mt-1 text-xs text-blue-600">
+                      LMS User: {ltiContext.fullName}
+                      {ltiContext.lmsRoles && ltiContext.lmsRoles.length > 0 && (
+                        <> ({ltiContext.lmsRoles.map((r: string) => r.split('/').pop()).join(', ')})</>
+                      )}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowLtiWelcome(false)}
+                  className="flex-shrink-0 text-blue-400 hover:text-blue-600"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* User Greeting Section */}
           <div className="mb-6 flex items-center justify-between rounded-lg bg-gradient-to-r from-orange-50 to-orange-100 p-4">
             <div>

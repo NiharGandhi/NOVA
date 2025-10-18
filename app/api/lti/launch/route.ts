@@ -365,44 +365,55 @@ export async function POST(request: NextRequest) {
     // Create a NOVA session for the user
     if (novaUser) {
       try {
-        console.log('Creating session for user:', novaUser.email);
+        console.log('Creating session for user:', novaUser.id, novaUser.email);
 
-        // Generate a magic link to create a session token
-        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+        // Use admin API to create a session directly for this specific user
+        const { data, error: sessionError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
           email: novaUser.email!,
+          options: {
+            redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/home?lti_launch=true`,
+          },
         });
 
-        if (linkError || !linkData) {
-          console.error('Failed to generate magic link:', linkError);
-          throw linkError || new Error('No link data returned');
+        if (sessionError || !data) {
+          console.error('Failed to generate link:', sessionError);
+          throw sessionError || new Error('No link data returned');
         }
 
-        console.log('Generated magic link successfully');
+        console.log('Generated auth link for user:', novaUser.id);
 
-        // The hashed_token from generateLink can be used to verify OTP
-        const hashedToken = linkData.properties.hashed_token;
+        // Get the hashed token from the response
+        const hashedToken = data.properties?.hashed_token;
 
         if (!hashedToken) {
-          console.error('No hashed_token in link data');
+          console.error('No hashed token in response');
           throw new Error('Missing hashed_token from generated link');
         }
 
-        console.log('Got hashed token, verifying...');
-
-        // Verify the OTP using the hashed token
-        // Note: When using token_hash, we should NOT pass email
+        // Verify OTP to get session - this creates a session for the specific user
         const { data: sessionData, error: verifyError } = await supabase.auth.verifyOtp({
           type: 'email',
           token_hash: hashedToken,
         });
 
-        if (verifyError || !sessionData?.session) {
+        if (verifyError || !sessionData?.session || !sessionData?.user) {
           console.error('Failed to verify OTP:', verifyError);
           throw verifyError || new Error('No session created from OTP verification');
         }
 
-        console.log('Session created successfully');
+        // Double-check that the session is for the correct user
+        if (sessionData.user.id !== novaUser.id) {
+          console.error('Session mismatch!', {
+            expected: novaUser.id,
+            got: sessionData.user.id,
+            expectedEmail: novaUser.email,
+            gotEmail: sessionData.user.email,
+          });
+          throw new Error(`Session created for wrong user. Expected ${novaUser.email} but got ${sessionData.user.email}`);
+        }
+
+        console.log('Session created successfully for correct user:', sessionData.user.id);
 
         // Create redirect URL with authentication tokens as query params
         const callbackUrl = new URL(`${process.env.NEXT_PUBLIC_APP_URL}/api/lti/callback`);
@@ -413,13 +424,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.redirect(callbackUrl.toString());
       } catch (authError) {
         console.error('Authentication error:', authError);
-        console.error('User email:', novaUser.email);
+        console.error('User info:', { id: novaUser.id, email: novaUser.email });
         console.error('Stack:', authError instanceof Error ? authError.stack : 'N/A');
 
         return NextResponse.json(
           {
             error: 'Failed to create user session',
             details: authError instanceof Error ? authError.message : 'Unknown error',
+            user_id: novaUser.id,
             user_email: novaUser.email,
           },
           { status: 500 }
