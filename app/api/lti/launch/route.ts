@@ -176,22 +176,31 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Find the user by email
-        const foundUser = existingUsers.users.find(u => u.email === userEmail);
+        // First try to find user by LTI metadata (more accurate)
+        let foundUser = existingUsers.users.find(u =>
+          u.user_metadata?.lti_user_id === userInfo.userId &&
+          u.user_metadata?.platform_id === platform.id
+        );
+
+        // If not found by LTI metadata, try by email
+        if (!foundUser) {
+          foundUser = existingUsers.users.find(u => u.email === userEmail);
+        }
 
         if (!foundUser) {
-          console.error('User exists but could not find by email');
+          console.error('User exists but could not find by email or LTI metadata');
           return NextResponse.json(
             {
               error: 'Failed to provision user - user exists but not found',
               email: userEmail,
+              lti_user_id: userInfo.userId,
             },
             { status: 500 }
           );
         }
 
         novaUser = foundUser;
-        console.log('Found existing user:', novaUser.id, novaUser.email);
+        console.log('Found existing user:', novaUser.id, novaUser.email, 'with metadata:', novaUser.user_metadata);
       } else if (authError) {
         console.error('Failed to create auth user:', authError);
         console.error('User info:', userInfo);
@@ -402,15 +411,23 @@ export async function POST(request: NextRequest) {
           throw verifyError || new Error('No session created from OTP verification');
         }
 
+        // Log detailed session info for debugging
+        console.log('Session verification result:', {
+          sessionUserId: sessionData.user.id,
+          sessionUserEmail: sessionData.user.email,
+          expectedUserId: novaUser.id,
+          expectedUserEmail: novaUser.email,
+          match: sessionData.user.id === novaUser.id,
+        });
+
         // Double-check that the session is for the correct user
         if (sessionData.user.id !== novaUser.id) {
           console.error('Session mismatch!', {
-            expected: novaUser.id,
-            got: sessionData.user.id,
-            expectedEmail: novaUser.email,
-            gotEmail: sessionData.user.email,
+            expected: { id: novaUser.id, email: novaUser.email },
+            got: { id: sessionData.user.id, email: sessionData.user.email },
+            ltiUserInfo: userInfo,
           });
-          throw new Error(`Session created for wrong user. Expected ${novaUser.email} but got ${sessionData.user.email}`);
+          throw new Error(`Session created for wrong user. Expected ${novaUser.email} (${novaUser.id}) but got ${sessionData.user.email} (${sessionData.user.id})`);
         }
 
         console.log('Session created successfully for correct user:', sessionData.user.id);
