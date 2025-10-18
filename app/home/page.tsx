@@ -143,7 +143,7 @@ function HomeContent() {
                     Connected via {ltiContext.platform?.name || 'LMS'}
                   </h3>
                   <p className="mt-1 text-sm text-blue-700">
-                    You're accessing NOVA from your LMS.
+                    You&quot;re accessing NOVA from your LMS.
                     {ltiContext.enrollment?.context?.context_title && (
                       <> Course: <span className="font-medium">{ltiContext.enrollment.context.context_title}</span></>
                     )}
