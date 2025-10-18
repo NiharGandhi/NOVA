@@ -111,14 +111,23 @@ export async function POST(request: NextRequest) {
     let novaUser;
 
     // Check if user mapping already exists
-    const { data: existingMapping } = await supabase
+    const { data: existingMapping, error: mappingError } = await supabase
       .from('lti_user_mappings')
       .select('*, users:nova_user_id(*)')
       .eq('platform_id', platform.id)
       .eq('lti_user_id', userInfo.userId)
       .single();
 
+    console.log('Existing mapping lookup result:', {
+      found: !!existingMapping,
+      error: mappingError?.message,
+      platformId: platform.id,
+      ltiUserId: userInfo.userId,
+    });
+
     if (existingMapping) {
+      console.log('Found existing mapping, fetching auth user:', existingMapping.nova_user_id);
+
       // Update existing mapping
       await supabase
         .from('lti_user_mappings')
@@ -133,7 +142,21 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', existingMapping.id);
 
-      novaUser = existingMapping.users;
+      // Fetch the auth user data (not the users table data)
+      const { data: authUserData, error: authUserError } = await supabase.auth.admin.getUserById(
+        existingMapping.nova_user_id
+      );
+
+      if (authUserError || !authUserData.user) {
+        console.error('Failed to fetch auth user:', authUserError);
+        return NextResponse.json(
+          { error: 'Failed to fetch user account', details: authUserError?.message },
+          { status: 500 }
+        );
+      }
+
+      novaUser = authUserData.user;
+      console.log('Using existing mapped user:', novaUser.id, novaUser.email);
     } else if (platform.auto_provision_users) {
       // Auto-provision new user
       // Generate email if not provided by LMS
