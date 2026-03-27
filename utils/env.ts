@@ -31,10 +31,10 @@ export function getServiceRoleKey(): string {
 }
 
 /**
- * Retrieve the Supabase public URL from environment variables.
+ * Get the public Supabase URL from the NEXT_PUBLIC_SUPABASE_URL environment variable.
  *
- * @returns The Supabase public URL from `NEXT_PUBLIC_SUPABASE_URL`.
- * @throws If `NEXT_PUBLIC_SUPABASE_URL` is not set.
+ * @returns The configured `NEXT_PUBLIC_SUPABASE_URL`.
+ * @throws Error if `NEXT_PUBLIC_SUPABASE_URL` is not set.
  */
 export function getSupabaseUrl(): string {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
