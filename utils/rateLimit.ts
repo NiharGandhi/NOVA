@@ -27,10 +27,10 @@ export async function checkChatRateLimit(userId: string): Promise<{ allowed: boo
 }
 
 /**
- * Checks whether the specified user is permitted to perform an upload under the configured upload rate limiter.
+ * Determine whether a user is allowed to perform an upload under the configured upload rate limiter.
  *
- * @param userId - The identifier of the user to check
- * @returns An object with `allowed` set to `true` if the upload is permitted (or if no limiter is configured), and `reset` indicating when the rate-limit window resets according to the limiter
+ * @param userId - The user identifier to check
+ * @returns `allowed` is `true` if the upload is permitted, `false` otherwise. `reset` is the Unix timestamp in seconds when the rate-limit window resets; `0` if no limiter is configured.
  */
 export async function checkUploadRateLimit(userId: string): Promise<{ allowed: boolean; reset: number }> {
   if (!uploadLimiter) return { allowed: true, reset: 0 };
