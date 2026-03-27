@@ -6,7 +6,12 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.docx', '.pptx', '.txt']);
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; /**
+ * Validates an uploaded File against size, MIME type, and filename extension constraints.
+ *
+ * @param file - The uploaded file to validate
+ * @returns An object with `valid: true` when the file meets the constraints, or `valid: false` and an `error` message explaining the first failed check
+ */
 
 export function validateUploadedFile(file: File): { valid: boolean; error?: string } {
   if (file.size > MAX_FILE_SIZE_BYTES) {

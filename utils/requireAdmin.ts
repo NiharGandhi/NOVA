@@ -2,6 +2,12 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 
+/**
+ * Validate a Bearer token from the request and ensure the authenticated user has the 'admin' role.
+ *
+ * @param request - Incoming Request expected to include an `Authorization: Bearer <token>` header
+ * @returns An object `{ userId: string }` when authentication and admin check succeed; a `Response` with a JSON error and status `401` (Unauthorized) or `403` (Forbidden) otherwise
+ */
 export async function requireAdmin(request: Request): Promise<{ userId: string } | Response> {
   const authHeader = request.headers.get('Authorization');
   const token = authHeader?.split('Bearer ')[1];

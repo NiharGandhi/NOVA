@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Create a JSON health report for service dependencies.
+ *
+ * Performs lightweight checks for Supabase connectivity and required environment variables,
+ * then returns a JSON payload summarizing per-check results and an overall status.
+ *
+ * @returns A NextResponse with a JSON body { status, checks, ts } where `status` is "ok" when all checks are "ok" and "degraded" otherwise, `checks` maps dependency names to "ok" or "error", and `ts` is the current ISO timestamp; HTTP status is 200 when all checks pass, otherwise 503.
+ */
 export async function GET() {
   const checks: Record<string, 'ok' | 'error'> = {};
 
